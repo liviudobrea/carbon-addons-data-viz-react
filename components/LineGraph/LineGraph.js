@@ -67,6 +67,10 @@ const propTypes = {
    * Set this prop to false to prevent x values from being converted to time.
    */
   isXTime: PropTypes.bool,
+
+  xDomain: PropTypes.arrayOf(PropTypes.number),
+  yDomain: PropTypes.arrayOf(PropTypes.number),
+  yAxisTicks: PropTypes.number,
 };
 
 const defaultProps = {
@@ -91,7 +95,10 @@ const defaultProps = {
   timeFormat: '%I:%M:%S',
   xAxisLabel: 'X Axis',
   yAxisLabel: 'Y Axis',
+  yAxisTicks: 4,
   scaleType: 'linear',
+  xDomain: [],
+  yDomain: [],
   onHover: () => {},
   onMouseOut: () => {},
   formatValue: null,
@@ -173,21 +180,26 @@ class LineGraph extends Component {
 
   componentWillUpdate(nextProps) {
     if (this.x) {
-      const data =
-        nextProps.data.length > 0
-          ? nextProps.data
-          : _.flatten(nextProps.datasets);
-      this.x.domain(d3.extent(data, d => d[d.length - 1]));
+      const { yDomain, isXTime, isUTC, datasets, data } = nextProps;
+      const flatData = data.length > 0 ? data : _.flatten(datasets);
+      const chartData = flatData.map(d => {
+        return {
+          date: isXTime || isUTC ? new Date(d[1]) : d[1],
+          value: d[0],
+        };
+      });
+
+      this.x.domain(d3.extent(chartData, d => d.date));
       if (nextProps.scaleType === 'log') {
         this.y.domain([
-          0.1,
-          d3.max(_.flatMap(data, d => d.slice(0, d.length - 1))),
+          yDomain[0] || 0.1,
+          yDomain[0] || d3.max(chartData, d => d.value),
         ]);
         this.yAxis.scale(this.y.nice());
       } else {
         this.y.domain([
-          0,
-          d3.max(_.flatMap(data, d => d.slice(0, d.length - 1))),
+          yDomain[0] || 0,
+          yDomain[0] || d3.max(chartData, d => d.value),
         ]);
       }
       this.updateEmptyState(data);
@@ -288,7 +300,7 @@ class LineGraph extends Component {
           ? 30 + _.max(seriesLabels.map(l => l.length)) * 8
           : 0));
 
-    this.svg.selectAll('*').remove();
+    this.svg.remove();
 
     this.svg = d3
       .select(`#${containerId} svg`)
@@ -313,22 +325,22 @@ class LineGraph extends Component {
       showLegend,
       seriesLabels,
       scaleType,
-      hoverOverlay,
+      yDomain,
+      yAxisTicks,
+      xDomain,
       timeFormatLocale,
     } = this.props;
 
     this.updateEmptyState(data.length > 0 ? data : datasets);
 
-    if (hoverOverlay) {
-      this.overlay = this.svg
-        .append('rect')
-        .attr('class', 'bx--graph-overlay')
-        .attr('fill', '#3d70b2')
-        .style('opacity', '.1')
-        .attr('height', this.height);
-    }
-
     const flatData = data.length > 0 ? data : _.flatten(datasets);
+    const chartData = flatData.map(d => {
+      return {
+        date: isXTime || isUTC ? new Date(d[1]) : d[1],
+        value: d[0],
+      };
+    });
+
     if (isUTC) {
       this.x = d3.scaleUtc();
     } else if (isXTime) {
@@ -337,33 +349,35 @@ class LineGraph extends Component {
       this.x = d3.scaleLinear();
     }
 
-    this.x
-      .domain(d3.extent(flatData, d => d[d.length - 1]))
-      .range([0, this.width]);
+    this.x.range([0, this.width]).domain(d3.extent(chartData, d => d.date));
+
+    if (xDomain.length === 2) {
+      this.x.domain([xDomain[0], xDomain[1]]);
+    }
 
     if (scaleType === 'log') {
       this.y = d3
         .scaleLog()
+        .range([this.height, 0])
         .domain([
-          0.1,
-          d3.max(_.flatMap(flatData, d => d.slice(0, d.length - 1))),
+          yDomain[0] || 0.1,
+          yDomain[1] || d3.max(chartData, d => d.value),
         ]);
     } else {
       this.y = d3
         .scaleLinear()
+        .range([this.height, 0])
         .domain([
-          0,
-          d3.max(_.flatMap(flatData, d => d.slice(0, d.length - 1))),
+          yDomain[0] || 0,
+          yDomain[1] || d3.max(chartData, d => d.value),
         ]);
     }
 
-    this.y.range([this.height, 0]);
-
     this.line = d3
       .line()
-      .x(d => this.x(d[d.length - 1]))
-      .y(d => this.y(d[this.count]))
-      .defined(d => !isNaN(d[this.count]));
+      .x(d => this.x(d[1]))
+      .y(d => this.y(d[0]))
+      .defined(d => !isNaN(d[0]));
 
     if (timeFormatLocale) {
       d3.timeFormatDefaultLocale(timeFormatLocale);
@@ -375,18 +389,15 @@ class LineGraph extends Component {
 
     this.xAxis = d3
       .axisBottom()
-      .scale(this.x)
-      .ticks(d3.timeMonth.every(1));
-
-    if (timeFormat) {
-      this.xAxis.tickFormat(isXTime ? tickFormat : null);
-    }
+      .scale(this.x.nice())
+      .tickSize(0)
+      .tickFormat(isXTime ? tickFormat : null);
 
     this.yAxis = d3
       .axisLeft()
-      .ticks(5)
+      .scale(this.y.nice())
       .tickSize(-this.width)
-      .scale(this.y.nice());
+      .ticks(yAxisTicks);
 
     if (scaleType === 'log') {
       this.yAxis.tickFormat(d3.format('~s'));
@@ -468,8 +479,6 @@ class LineGraph extends Component {
     const hasData = data.length > 0;
     const numLines = hasData ? data[0].length - 1 : datasets.length;
 
-    this.count = 0;
-
     const lineContainer = this.svg.append('g').attr('class', 'line-container');
 
     if (hasData || _.max(datasets.map(d => d.length)) > 0) {
@@ -486,7 +495,7 @@ class LineGraph extends Component {
           .attr('pointer-events', 'none')
           .attr('d', this.line);
 
-        var totalLength = path.node().getTotalLength();
+        let totalLength = path.node().getTotalLength();
 
         if (drawLine) {
           path
@@ -500,14 +509,22 @@ class LineGraph extends Component {
             .attr('stroke-dasharray', 0 + ' ' + totalLength)
             .attr('stroke-dasharray', totalLength + ' ' + 0);
         }
-
-        this.count += hasData ? 1 : 0;
       }
     }
   }
 
   renderOverlay() {
-    const hoverOverlay = this.svg
+    const { hoverOverlay } = this.props;
+    if (hoverOverlay) {
+      this.overlay = this.svg
+        .append('rect')
+        .attr('class', 'bx--graph-overlay')
+        .attr('fill', '#3d70b2')
+        .style('opacity', '.1')
+        .attr('height', this.height);
+    }
+
+    const overlayEl = this.svg
       .append('rect')
       .attr('width', this.width)
       .attr('height', this.height)
@@ -518,7 +535,7 @@ class LineGraph extends Component {
         this.onMouseMove();
       })
       .on('mouseout', () => {
-        this.onMouseOut(hoverOverlay.node());
+        this.onMouseOut(overlayEl.node());
       });
   }
 
@@ -586,7 +603,7 @@ class LineGraph extends Component {
   }
 
   onMouseMove() {
-    if (!this.id) return null;
+    if (!this.svgNode) return null;
 
     const {
       margin,
@@ -604,15 +621,13 @@ class LineGraph extends Component {
       multiValueTooltip,
     } = this.props;
 
-    if (data.length >= 2 || _.max(datasets.map(d => d.length)) >= 2) {
-      const bisectDate = d3.bisector(function(d) {
-        return d[d.length - 1];
-      }).right;
-      const mouse = d3.mouse(this.id)[0] - margin.left;
+    if (data.length > 2 || _.max(datasets.map(d => d.length)) > 2) {
+      const bisectDate = d3.bisector(d => d[d.length - 1]).right;
+      const mouse = d3.mouse(this.svgNode)[0] - margin.left;
       const timestamp = this.x.invert(mouse);
       let d, mouseData, tooltipHeading, tooltipData;
       if (data.length > 0) {
-        const index = bisectDate(data, timestamp);
+        const index = bisectDate(data, timestamp, 1);
         const d0 = data[index - 1];
         const d1 = data[index];
 
@@ -621,7 +636,6 @@ class LineGraph extends Component {
             timestamp - d0[d0.length - 1] > d1[d1.length - 1] - timestamp
               ? d1
               : d0;
-
           mouseData = {
             data: d,
             datasets,
@@ -633,10 +647,16 @@ class LineGraph extends Component {
           };
 
           if (hoverOverlay) {
-            const endDate = d0;
-            const startDate = d1;
-            const overlayWidth = Math.abs(this.x(endDate) - this.x(startDate));
-            const xPos = this.x(startDate) + overlayWidth / 2;
+            const startDate = d0[d0.length - 1];
+            const endDate = d1[d1.length - 1];
+            const x0 = this.x(d[d.length - 1]);
+            let overlayWidth = Math.abs(this.x(endDate) - this.x(startDate));
+            let xPos = Math.min(Math.max(0, x0 - overlayWidth / 2), this.width);
+            if (d[d.length - 1] === data[0][1]) {
+              overlayWidth = overlayWidth / 2 + x0;
+            } else if (d[d.length - 1] === data[data.length - 1][1]) {
+              overlayWidth = overlayWidth / 2 + this.width - x0;
+            }
             this.overlay
               .style('display', 'inherit')
               .attr('width', overlayWidth)
@@ -661,7 +681,7 @@ class LineGraph extends Component {
         }
       } else {
         const mouseX = this.x(timestamp);
-        const mouseY = d3.mouse(this.id)[1] - margin.top;
+        const mouseY = d3.mouse(this.svgNode)[1] - margin.top;
         const distances = [];
         d = _.sortBy(_.flatten(datasets), a => {
           const aDist =
@@ -673,6 +693,7 @@ class LineGraph extends Component {
         const i = datasets.findIndex(set => set.includes(d));
 
         if (hoverOverlay) {
+          const x0 = this.x(d[d.length - 1]);
           const endDate = d[d.length - 1];
           const endDateIdx = datasets[i].findIndex(
             v => v[v.length - 1] === endDate
@@ -685,15 +706,19 @@ class LineGraph extends Component {
           if (endDateIdx === 0) {
             startSet = datasets[i][1];
             startDate = startSet[startSet.length - 1];
-            overlayWidth = (this.x(startDate) - this.x(endDate)) / 2;
-            xPos = 0;
+            overlayWidth = Math.abs(this.x(endDate) - this.x(startDate));
+            xPos = Math.min(Math.max(0, x0 - overlayWidth / 2), this.width);
+            overlayWidth = Math.min(overlayWidth, overlayWidth / 2 + x0);
           } else {
             startSet = datasets[i][Math.max(endDateIdx - 1, 0)];
             startDate = startSet[startSet.length - 1];
             overlayWidth = Math.abs(this.x(endDate) - this.x(startDate));
-            xPos = this.x(startDate) + overlayWidth / 2;
+            xPos = Math.min(Math.max(0, x0 - overlayWidth / 2), this.width);
             if (endDateIdx === datasetLength - 1) {
-              overlayWidth = overlayWidth / 2;
+              overlayWidth = Math.min(
+                overlayWidth,
+                overlayWidth / 2 + this.width - x0
+              );
             }
           }
           this.overlay
@@ -766,7 +791,7 @@ class LineGraph extends Component {
         id={containerId}
         style={{ position: 'relative' }}>
         <p className="bx--line-graph-empty-text" />
-        <svg id={id} ref={id => (this.id = id)} />
+        <svg id={id} ref={node => (this.svgNode = node)} />
         <div id={`${id}-tooltip`} ref={id => (this.tooltipId = id)} />
       </div>
     );

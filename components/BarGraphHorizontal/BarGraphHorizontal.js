@@ -22,7 +22,6 @@ const propTypes = {
   onMouseOut: PropTypes.func,
   emptyText: PropTypes.string,
   color: PropTypes.array,
-  seriesLabels: PropTypes.array,
   showTooltip: PropTypes.bool,
   formatValue: PropTypes.func,
   formatTooltipData: PropTypes.func,
@@ -380,7 +379,8 @@ class BarGraphHorizontal extends Component {
           ? this.yScale1.bandwidth() / 2
           : this.yScale.bandwidth() / 2);
 
-      d3.select(this.tooltipId)
+      d3
+        .select(this.tooltipId)
         .style('position', 'relative')
         .style('z-index', 1)
         .style('left', `${leftPos}px`)

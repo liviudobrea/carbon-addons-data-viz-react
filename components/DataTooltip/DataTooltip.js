@@ -25,7 +25,7 @@ class DataTooltip extends Component {
     const items = data.map((item, i) => {
       let divStyle;
       if (item.color) {
-        if (data.length > 1 && heading) {
+        if (data.length > 1 && heading != null) {
           divStyle = {
             borderLeft: `4px solid ${item.color}`,
           };
@@ -113,7 +113,7 @@ class DataTooltip extends Component {
         className={tooltipClasses}
         data-floating-menu-direction={direction}
         {...other}>
-        {heading && <p className={headingClasses}>{heading}</p>}
+        {heading != null && <p className={headingClasses}>{heading}</p>}
         <ul className={tooltipListClasses} style={listStyle}>
           {this.renderTooltipData()}
         </ul>

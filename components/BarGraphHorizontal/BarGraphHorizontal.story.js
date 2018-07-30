@@ -158,25 +158,27 @@ storiesOf('BarGraphHorizontal', module)
       Auto resizing Horizontal Bar Graph.
     `,
     () => {
-      const chartRef = React.createRef();
+      let componentRef;
+      const Component = React.createElement(
+        BarGraphHorizontal,
+        {
+          ref: element => (componentRef = element),
+          onHover: action('Hover'),
+          timeFormat: '%b',
+          data,
+          ...props,
+        },
+        null
+      );
 
       resizeInterval = setInterval(() => {
-        if (chartRef.current && typeof chartRef.current.resize === 'function') {
+        if (componentRef && typeof componentRef.resize === 'function') {
           const height = Math.max(300, Math.min(Math.random() * 1000, 550));
           const width = Math.max(650, Math.min(Math.random() * 1000, 900));
-          chartRef.current.resize(height, width);
+          componentRef.resize(height, width);
         }
-      }, 3500);
-
-      return (
-        <BarGraphHorizontal
-          ref={chartRef}
-          onHover={action('Hover')}
-          timeFormat="%b"
-          data={data}
-          {...props}
-        />
-      );
+      }, 2500);
+      return Component;
     }
   )
   .addWithInfo(
@@ -190,28 +192,6 @@ storiesOf('BarGraphHorizontal', module)
         onHover={action('Hover')}
         data={groupedData}
         {...props}
-      />
-    )
-  )
-  .addWithInfo(
-    'Grouped with Custom Labels',
-    `
-     Grouped Horizontal Bar Graph with Custom Labels.
-    `,
-    () => (
-      <BarGraphHorizontal
-        {...props}
-        onHover={action('Hover')}
-        yAxisLabel="Amount ($)"
-        xAxisLabel=""
-        seriesLabels={['Fixed Rate', 'Dynamic Rate']}
-        data={[
-          [[6810753.913996485, 322316.83828169684], 'NEW YORK, NY, US'],
-          [[2029509.2509859744, 319256.4128819143], 'LONDON, GB'],
-          [[1180299.5624584288, 98796.86410370439], 'AUSTIN, TX, US'],
-          [[997409.8602056602, 301419.9550709436], 'DALLAS, TX, US'],
-          [[1306600.6748098487, 82748.73011782495], 'DURHAM, NC, US'],
-        ]}
       />
     )
   )

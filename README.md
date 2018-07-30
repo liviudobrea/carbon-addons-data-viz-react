@@ -14,7 +14,7 @@ Import the graph:
 
 Import the styles:
 
-`@import 'carbon-addons-data-viz-react/sass/index.scss';`
+`@import 'carbon-addons-data-viz-react/sass/index';`
 
 Here is a link to a Code Sandbox example in which you can play around: https://codesandbox.io/s/ov4169pq36
 
