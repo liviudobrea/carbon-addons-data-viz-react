@@ -21,6 +21,7 @@ const propTypes = {
   emptyText: PropTypes.string,
   formatTooltipData: PropTypes.func,
   onHover: PropTypes.func,
+  spacing: PropTypes.string,
 };
 
 const defaultProps = {
@@ -43,6 +44,7 @@ const defaultProps = {
   showTooltip: true,
   onHover: () => {},
   formatValue: null,
+  spacing: 'default',
   formatTooltipData: ({ data, label, index, circle }) => {
     return [
       {
@@ -129,7 +131,7 @@ class BubbleChart extends Component {
   }
 
   initialRender() {
-    const { data, formatValue } = this.props;
+    const { data, formatValue, spacing } = this.props;
 
     this.updateEmptyState(data);
 
@@ -140,7 +142,7 @@ class BubbleChart extends Component {
 
     this.xAxis = d3
       .axisBottom()
-      .ticks(4)
+      .ticks(spacing === 'default' ? 5 : 0)
       .tickSize(-this.height)
       .scale(this.xScale);
 
@@ -217,7 +219,7 @@ class BubbleChart extends Component {
   }
 
   renderPoints() {
-    const { data } = this.props;
+    const { data, spacing } = this.props;
     const valuesMap = data.map(d => d[0]);
     const valueTotals = d3.sum(valuesMap);
 
@@ -230,7 +232,16 @@ class BubbleChart extends Component {
       .append('circle')
       .attr('class', 'circle')
       .attr('data-point', (d, i) => i)
-      .attr('cx', d => this.xScale(d[0]))
+      .attr('cx', (d, i) => {
+        if (spacing === 'even') {
+          const rad = d3.min([
+            this.height * 0.7,
+            Math.max((d[0] / valueTotals) * 100, 5),
+          ]);
+          return (this.width / data.length) * i + rad / 2;
+        }
+        return this.xScale(d[0]);
+      })
       .attr('cy', this.height / 2)
       .attr('fill', (d, i) => this.color(i))
       .attr('r', 0)
@@ -238,7 +249,7 @@ class BubbleChart extends Component {
       .duration(350)
       .delay((d, i) => i * 40)
       .attr('r', d =>
-        d3.min([this.height * 0.7, Math.max(d[0] / valueTotals * 100, 5)])
+        d3.min([this.height * 0.7, Math.max((d[0] / valueTotals) * 100, 5)])
       );
 
     this.svg
@@ -268,7 +279,13 @@ class BubbleChart extends Component {
   }
 
   onMouseEnter(d, i) {
-    const { showTooltip, formatTooltipData, margin } = this.props;
+    const {
+      showTooltip,
+      spacing,
+      data,
+      formatTooltipData,
+      margin,
+    } = this.props;
     const mouseData = this.getMouseData(d, i);
 
     let circle = this.svg.select(`circle[data-point="${mouseData.index}"]`);
@@ -293,11 +310,13 @@ class BubbleChart extends Component {
       const offsetY = tooltipSize.height + 5;
       const offsetX = tooltipSize.width / 2;
       const circleRadius = parseInt(circle.attr('r'), 10);
-      const leftPos = this.xScale(mouseData.data[0]) + margin.left - offsetX;
+      let leftPos = this.xScale(mouseData.data[0]) + margin.left - offsetX;
+      if (spacing === 'even') {
+        leftPos = (this.width / data.length) * i + circleRadius / 2 + offsetX;
+      }
       const topPos = -this.height / 2 - margin.bottom - circleRadius - offsetY;
 
-      d3
-        .select(this.tooltipId)
+      d3.select(this.tooltipId)
         .style('position', 'relative')
         .style('z-index', 1)
         .style('left', `${leftPos}px`)
@@ -341,7 +360,7 @@ class BubbleChart extends Component {
         id={containerId}
         style={{ position: 'relative' }}>
         <p className="bx--bar-graph-empty-text" />
-        <svg id={id} ref={id => (this.id = id)} />
+        <svg id={id} />
         <div
           className="bx--graph-tooltip"
           id="tooltip-div"
