@@ -360,8 +360,7 @@ class BarGraph extends Component {
         .getBoundingClientRect();
       const offset = -tooltipSize.width / 2;
 
-      d3
-        .select(this.tooltipId)
+      d3.select(this.tooltipId)
         .style('position', 'relative')
         .style(
           'left',
@@ -404,7 +403,7 @@ class BarGraph extends Component {
     this.height = height - (margin.top + margin.bottom);
     this.width = width - (margin.left + margin.right);
 
-    this.svg.selectAll('*').remove();
+    this.svg.remove();
 
     this.svg = d3
       .select(`#${containerId} svg`)
@@ -475,7 +474,7 @@ class BarGraph extends Component {
         id={containerId}
         style={{ position: 'relative' }}>
         <p className="bx--bar-graph-empty-text" />
-        <svg id={id} ref={id => (this.id = id)} />
+        <svg id={id} />
         <div
           className="bx--graph-tooltip"
           id="tooltip-div"
