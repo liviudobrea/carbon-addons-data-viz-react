@@ -95,12 +95,6 @@ class PieChart extends Component {
       .attr('class', 'group-container')
       .attr('transform', `translate(${this.width / 2}, ${this.height / 2})`);
 
-    if (showTotals) {
-      this.renderTooltip();
-    }
-
-    const updateTextStyles = this.updateTextStyles.bind(this);
-
     const arc = this.svg
       .selectAll('.arc')
       .data(pie(data))
@@ -124,10 +118,9 @@ class PieChart extends Component {
     const totalAmount = data.reduce((acc, values) => (acc += values[1]), 0);
 
     if (showTotals) {
-      this.svg.select(`.bx--pie-tooltip`).style('display', 'block');
-      this.svg.select(`.bx--pie-key`).text('Total');
-      this.svg.select(`.bx--pie-value`).text(`${formatValue(totalAmount)}`);
-      this.updateTextStyles();
+      d3.select(`#${id} .bx--pie-tooltip`).style('display', 'block');
+      d3.select(`#${id} .bx--pie-key`).text('Total');
+      d3.select(`#${id} .bx--pie-value`).text(`${formatValue(totalAmount)}`);
     }
 
     this.svg
@@ -141,7 +134,6 @@ class PieChart extends Component {
         d3.select(`#${id} .bx--pie-tooltip`).style('display', 'inherit');
         d3.select(`#${id} .bx--pie-key`).text(`${d.data[0]}`);
         d3.select(`#${id} .bx--pie-value`).text(`${formatValue(d.data[1])}`);
-        updateTextStyles();
         if (onHover) {
           onHover(true, d.data[0]);
         }
@@ -191,7 +183,6 @@ class PieChart extends Component {
           d3.select(`#${id} .bx--pie-value`).text(
             `${formatValue(totalAmount)}`
           );
-          updateTextStyles();
         }
 
         if (onHover) {
@@ -201,47 +192,29 @@ class PieChart extends Component {
       });
   }
 
-  updateTextStyles() {
-    const tooltip = this.svg.select('.bx--pie-tooltip');
-    tooltip.select('.bx--pie-value').attr('x', (d, i, text) => {
-      return -text[0].getBBox().width / 2;
-    });
-
-    tooltip
-      .select('.bx--pie-key')
-      .attr('x', (d, i, text) => {
-        return -text[0].getBBox().width / 2;
-      })
-      .attr('y', (d, i, text) => {
-        return text[0].getBBox().height;
-      });
-  }
-
-  renderTooltip() {
-    const tooltip = this.svg
-      .append('g')
-      .attr('class', 'bx--pie-tooltip')
-      .style('display', 'none')
-      .attr('x', this.width / 2)
-      .attr('y', this.height / 2);
-
-    tooltip
-      .append('text')
-      .attr('class', 'bx--pie-value')
-      .style('font-size', '29px')
-      .style('line-height', 1)
-      .style('font-weight', '300');
-
-    tooltip
-      .append('text')
-      .attr('class', 'bx--pie-key')
-      .style('font-size', '14px')
-      .style('color', '#5A6872')
-      .style('font-weight', '400');
-  }
-
   render() {
     const { id } = this.props;
+    const tooltipStyles = {
+      display: 'none',
+      position: 'absolute',
+      top: '50%',
+      left: '50%',
+      transform: 'translate(-50%, -50%)',
+    };
+
+    const keyStyles = {
+      fontSize: '14px',
+      fontWeight: '400',
+      textAlign: 'center',
+      color: '#5A6872',
+    };
+
+    const valueStyles = {
+      fontSize: '29px',
+      fontWeight: '300',
+      textAlign: 'center',
+      lineHeight: '1',
+    };
 
     this.renderSVG();
 
@@ -251,15 +224,17 @@ class PieChart extends Component {
         id={id}
         style={{
           position: 'relative',
-          width: this.width,
-          height: this.height,
+          width: this.props.radius * 2,
+          height: this.props.radius * 2 + 24,
         }}>
-        <svg ref={node => (this.svgNode = node)} />
-        <div
-          className="bx--graph-tooltip"
-          id="tooltip-div"
-          ref={id => (this.tooltipId = id)}
-        />
+        <div style={{ position: 'relative', width: this.props.radius * 2 }}>
+          <svg ref={node => (this.svgNode = node)} />
+          <div className="bx--pie-tooltip" style={tooltipStyles}>
+            <p className="bx--pie-value" style={valueStyles} />
+            <p className="bx--pie-key" style={keyStyles} />
+          </div>
+          <div id="tooltip-div" ref={id => (this.tooltipId = id)} />
+        </div>
       </div>
     );
   }
