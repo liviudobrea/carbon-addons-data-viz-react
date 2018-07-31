@@ -81,4 +81,34 @@ storiesOf('PieChart', module)
       </div>
     )
   )
+  .addWithInfo(
+    'Resizing Pie Chart',
+    `
+      Pie Chart with totals.
+    `,
+    () => {
+      class PieResize extends Component {
+        state = { radius: 100 };
+        resetInterval = null;
+
+        componentDidMount() {
+          this.resetInterval = setInterval(() => {
+            const newRad = Math.min(120, Math.max(75, Math.random() * 120));
+            this.setState({ radius: newRad });
+          }, 5000);
+        }
+
+        componentWillUnmount() {
+          clearInterval(this.resetInterval);
+          this.resetInterval = null;
+        }
+
+        render() {
+          const { radius } = this.state;
+          return <PieChart id="totals" {...props} radius={radius} showTotals />;
+        }
+      }
+      return <PieResize />;
+    }
+  )
   .addWithInfo('Updating', `Pie Chart w/ Updates`, () => <PieUpdater />);
