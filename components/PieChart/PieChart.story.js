@@ -77,7 +77,7 @@ storiesOf('PieChart', module)
     `,
     () => (
       <div>
-        <PieChart id="totals" {...props} showTotals />
+        <PieChart id="totals" {...props} radius={115} showTotals />
       </div>
     )
   )

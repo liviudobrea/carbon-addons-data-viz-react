@@ -95,6 +95,12 @@ class PieChart extends Component {
       .attr('class', 'group-container')
       .attr('transform', `translate(${this.width / 2}, ${this.height / 2})`);
 
+    if (showTotals) {
+      this.renderTooltip();
+    }
+
+    const updateTextStyles = this.updateTextStyles.bind(this);
+
     const arc = this.svg
       .selectAll('.arc')
       .data(pie(data))
@@ -118,16 +124,16 @@ class PieChart extends Component {
     const totalAmount = data.reduce((acc, values) => (acc += values[1]), 0);
 
     if (showTotals) {
-      d3.select(`#${id} .bx--pie-tooltip`).style('display', 'block');
-      d3.select(`#${id} .bx--pie-key`).text('Total');
-      d3.select(`#${id} .bx--pie-value`).text(`${formatValue(totalAmount)}`);
+      this.svg.select(`.bx--pie-tooltip`).style('display', 'block');
+      this.svg.select(`.bx--pie-key`).text('Total');
+      this.svg.select(`.bx--pie-value`).text(`${formatValue(totalAmount)}`);
+      this.updateTextStyles();
     }
 
     this.svg
       .selectAll('path')
       .on('mouseover', function(d) {
-        d3
-          .select(this)
+        d3.select(this)
           .transition()
           .style('cursor', 'pointer')
           .attr('d', pathTwo);
@@ -135,6 +141,7 @@ class PieChart extends Component {
         d3.select(`#${id} .bx--pie-tooltip`).style('display', 'inherit');
         d3.select(`#${id} .bx--pie-key`).text(`${d.data[0]}`);
         d3.select(`#${id} .bx--pie-value`).text(`${formatValue(d.data[1])}`);
+        updateTextStyles();
         if (onHover) {
           onHover(true, d.data[0]);
         }
@@ -151,34 +158,40 @@ class PieChart extends Component {
             .node()
             .getBoundingClientRect();
           const pos = path.centroid(d); //[x, y]
-          const leftPos = pos[0] + tooltipSize.width / 2 * pos[0] / 100;
-          const topPos = pos[1] + tooltipSize.height * pos[1] / 100;
-          d3
-            .select(tooltipId)
+          let leftPos = pos[0] + (tooltipSize.width * pos[0]) / 100;
+          let topPos = pos[1];
+          if (pos[1] < 0) {
+            topPos -= tooltipSize.height;
+          } else {
+            topPos += tooltipSize.height;
+          }
+          d3.select(tooltipId)
             .style('position', 'absolute')
             .style('top', `50%`)
             .style('left', `50%`)
-            .style('margin-left', `${leftPos}px`)
-            .style('margin-top', `${topPos}px`)
+            .style('transform', 'translate(-50%, -50%)')
             .style('width', `${tooltipSize.width}px`)
             .style('height', `${tooltipSize.height}px`)
-            .style('transform', 'translate(-50%, -50%)');
+            .selectAll('.bx--tooltip')
+            .style('left', `calc(${leftPos}px)`)
+            .style('top', `${topPos}px`);
         }
       })
       .on('mouseout', function() {
-        d3
-          .select(`#${id} .bx--pie-tooltip`)
-          .style('display', !showTotals && 'none');
-        d3
-          .select(this)
+        d3.select(`#${id} .bx--pie-tooltip`).style(
+          'display',
+          !showTotals && 'none'
+        );
+        d3.select(this)
           .transition()
           .attr('d', path);
         if (showTotals) {
           d3.select(`#${id} .bx--pie-tooltip`).style('display', 'block');
           d3.select(`#${id} .bx--pie-key`).text('Total');
-          d3
-            .select(`#${id} .bx--pie-value`)
-            .text(`${formatValue(totalAmount)}`);
+          d3.select(`#${id} .bx--pie-value`).text(
+            `${formatValue(totalAmount)}`
+          );
+          updateTextStyles();
         }
 
         if (onHover) {
@@ -188,29 +201,47 @@ class PieChart extends Component {
       });
   }
 
+  updateTextStyles() {
+    const tooltip = this.svg.select('.bx--pie-tooltip');
+    tooltip.select('.bx--pie-value').attr('x', (d, i, text) => {
+      return -text[0].getBBox().width / 2;
+    });
+
+    tooltip
+      .select('.bx--pie-key')
+      .attr('x', (d, i, text) => {
+        return -text[0].getBBox().width / 2;
+      })
+      .attr('y', (d, i, text) => {
+        return text[0].getBBox().height;
+      });
+  }
+
+  renderTooltip() {
+    const tooltip = this.svg
+      .append('g')
+      .attr('class', 'bx--pie-tooltip')
+      .style('display', 'none')
+      .attr('x', this.width / 2)
+      .attr('y', this.height / 2);
+
+    tooltip
+      .append('text')
+      .attr('class', 'bx--pie-value')
+      .style('font-size', '29px')
+      .style('line-height', 1)
+      .style('font-weight', '300');
+
+    tooltip
+      .append('text')
+      .attr('class', 'bx--pie-key')
+      .style('font-size', '14px')
+      .style('color', '#5A6872')
+      .style('font-weight', '400');
+  }
+
   render() {
     const { id } = this.props;
-    const tooltipStyles = {
-      display: 'none',
-      position: 'absolute',
-      top: '50%',
-      left: '50%',
-      transform: 'translate(-50%, -50%)',
-    };
-
-    const keyStyles = {
-      fontSize: '14px',
-      fontWeight: '400',
-      textAlign: 'center',
-      color: '#5A6872',
-    };
-
-    const valueStyles = {
-      fontSize: '29px',
-      fontWeight: '300',
-      textAlign: 'center',
-      lineHeight: '1',
-    };
 
     this.renderSVG();
 
@@ -224,10 +255,6 @@ class PieChart extends Component {
           height: this.height,
         }}>
         <svg ref={node => (this.svgNode = node)} />
-        <div className="bx--pie-tooltip" style={tooltipStyles}>
-          <p className="bx--pie-value" style={valueStyles} />
-          <p className="bx--pie-key" style={keyStyles} />
-        </div>
         <div
           className="bx--graph-tooltip"
           id="tooltip-div"
