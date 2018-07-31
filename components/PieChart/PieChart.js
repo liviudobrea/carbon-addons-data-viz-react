@@ -38,10 +38,7 @@ const defaultProps = {
 
 class PieChart extends Component {
   componentDidMount() {
-    this.width = this.props.radius * 2;
-    this.height = this.props.radius * 2 + 24;
-
-    this.renderSVG();
+    this.renderSVG(this.props);
   }
 
   componentWillReceiveProps(nextProps) {
@@ -54,7 +51,7 @@ class PieChart extends Component {
     return !_.isEqual(this.props, nextProps);
   }
 
-  renderSVG() {
+  renderSVG(props) {
     const {
       data,
       radius,
@@ -64,8 +61,12 @@ class PieChart extends Component {
       onHover,
       showTotals,
       showTooltip,
-    } = this.props;
-    const color = d3.scaleOrdinal(this.props.color);
+    } = props;
+
+    const width = props.radius * 2;
+    const height = props.radius * 2 + 24;
+
+    const color = d3.scaleOrdinal(props.color);
     const tooltipId = this.tooltipId;
     const pie = d3
       .pie()
@@ -88,12 +89,12 @@ class PieChart extends Component {
     }
 
     this.svg = d3
-      .select(this.svgNode)
-      .attr('width', this.width)
-      .attr('height', this.height)
+      .select(`#${id} svg`)
+      .attr('width', width)
+      .attr('height', height)
       .append('g')
       .attr('class', 'group-container')
-      .attr('transform', `translate(${this.width / 2}, ${this.height / 2})`);
+      .attr('transform', `translate(${width / 2}, ${height / 2})`);
 
     const arc = this.svg
       .selectAll('.arc')
@@ -115,7 +116,10 @@ class PieChart extends Component {
         return t => path(i(t));
       });
 
-    const totalAmount = data.reduce((acc, values) => (acc += values[1]), 0);
+    const totalAmount = data.reduce((acc, values) => {
+      acc += values[1];
+      return acc;
+    }, 0);
 
     if (showTotals) {
       d3.select(`#${id} .bx--pie-tooltip`).style('display', 'block');
@@ -193,7 +197,7 @@ class PieChart extends Component {
   }
 
   render() {
-    const { id } = this.props;
+    const { id, radius } = this.props;
     const tooltipStyles = {
       display: 'none',
       position: 'absolute',
@@ -216,19 +220,16 @@ class PieChart extends Component {
       lineHeight: '1',
     };
 
-    this.renderSVG();
+    const width = radius * 2;
+    const height = radius * 2 + 24;
 
     return (
       <div
         className="bx--graph-container"
         id={id}
-        style={{
-          position: 'relative',
-          width: this.props.radius * 2,
-          height: this.props.radius * 2 + 24,
-        }}>
-        <div style={{ position: 'relative', width: this.props.radius * 2 }}>
-          <svg ref={node => (this.svgNode = node)} />
+        style={{ position: 'relative', width, height }}>
+        <div style={{ position: 'relative', width }}>
+          <svg />
           <div className="bx--pie-tooltip" style={tooltipStyles}>
             <p className="bx--pie-value" style={valueStyles} />
             <p className="bx--pie-key" style={keyStyles} />
