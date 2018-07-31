@@ -76,7 +76,7 @@ storiesOf('PieChart', module)
       Pie Chart with totals.
     `,
     () => (
-      <div>
+      <div style={{ width: 500 }}>
         <PieChart id="totals" {...props} radius={115} showTotals />
       </div>
     )
