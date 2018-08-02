@@ -4,7 +4,7 @@ import BarGraphHorizontal from './BarGraphHorizontal';
 
 class UpdatingBarGraphHorizontalContainer extends Component {
   state = {
-    data: this.createGroupedData(4).sort(function(a, b) {
+    data: createGroupedData(4).sort(function(a, b) {
       return a[a.length - 1] - b[b.length - 1];
     }),
   };
@@ -23,24 +23,8 @@ class UpdatingBarGraphHorizontalContainer extends Component {
     clearInterval(this.interval);
   }
 
-  createGroupedData(num) {
-    let data = [];
-    for (let i = 0; i < num; i++) {
-      let numArr = [];
-      const one = Math.floor(Math.random() * 1000 + 10);
-      const two = Math.floor(Math.random() * 1000 + 10);
-      const three = Math.floor(Math.random() * 1000 + 10);
-      const four = Math.floor(Math.random() * 1000 + 10);
-      numArr.push(one, two, three, four);
-      let d = i;
-      const entry = [numArr, d];
-      data.push(entry);
-    }
-    return data;
-  }
-
   updateData(i) {
-    let data = this.createGroupedData(4).sort(function(a, b) {
+    let data = createGroupedData(4).sort(function(a, b) {
       return a[a.length - 1] - b[b.length - 1];
     });
 
@@ -110,7 +94,7 @@ function createGroupedData(num) {
 
 let data = createData(10);
 
-let groupedData = createGroupedData(3).sort(function(a, b) {
+let groupedData = createGroupedData(5).sort(function(a, b) {
   return a[1] - b[1];
 });
 
