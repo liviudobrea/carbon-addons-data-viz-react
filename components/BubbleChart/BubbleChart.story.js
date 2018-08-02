@@ -119,6 +119,20 @@ storiesOf('BubbleChart', module)
     () => <BubbleChart data={data} onHover={action('Hover')} {...props} />
   )
   .addWithInfo(
+    'Even Spacing',
+    `
+      Bubble Chart.
+    `,
+    () => (
+      <BubbleChart
+        data={data}
+        onHover={action('Hover')}
+        spacing="even"
+        {...props}
+      />
+    )
+  )
+  .addWithInfo(
     'Resizing',
     `
       Auto resizing Bubble Chart.

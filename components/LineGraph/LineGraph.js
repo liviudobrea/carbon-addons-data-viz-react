@@ -20,6 +20,16 @@ const propTypes = {
    * If your data set has multiple series, the seriesLabels array should contain strings labeling your series in the same order that your series appear in either data or datasets props.
    */
   seriesLabels: PropTypes.arrayOf(PropTypes.string),
+  timeFormatLocale: PropTypes.shape({
+    dateTime: PropTypes.string,
+    date: PropTypes.string,
+    time: PropTypes.string,
+    periods: PropTypes.arrayOf(PropTypes.string),
+    days: PropTypes.arrayOf(PropTypes.string),
+    shortDays: PropTypes.arrayOf(PropTypes.string),
+    months: PropTypes.arrayOf(PropTypes.string),
+    shortMonths: PropTypes.arrayOf(PropTypes.string),
+  }),
   height: PropTypes.number,
   width: PropTypes.number,
   id: PropTypes.string,
@@ -39,11 +49,28 @@ const propTypes = {
   drawLine: PropTypes.bool,
   animateAxes: PropTypes.bool,
   showTooltip: PropTypes.bool,
+  multiValueTooltip: PropTypes.bool,
   showLegend: PropTypes.bool,
+  formatValue: PropTypes.func,
+  formatTooltipData: PropTypes.func,
+
+  /**
+   * Displays overlay on top of chart slice when hovering specific area
+   */
+  hoverOverlay: PropTypes.bool,
+
+  /**
+   * Defines the scale of the line chart (oneOf('linear', 'log'))
+   */
+  scaleType: PropTypes.string,
   /**
    * Set this prop to false to prevent x values from being converted to time.
    */
   isXTime: PropTypes.bool,
+
+  xDomain: PropTypes.arrayOf(PropTypes.number),
+  yDomain: PropTypes.arrayOf(PropTypes.number),
+  yAxisTicks: PropTypes.number,
 };
 
 const defaultProps = {
@@ -54,6 +81,8 @@ const defaultProps = {
   width: 800,
   id: 'container',
   containerId: 'graph-container',
+  hoverOverlay: false,
+  multiValueTooltip: false,
   margin: {
     top: 30,
     right: 20,
@@ -66,8 +95,23 @@ const defaultProps = {
   timeFormat: '%I:%M:%S',
   xAxisLabel: 'X Axis',
   yAxisLabel: 'Y Axis',
+  yAxisTicks: 4,
+  scaleType: 'linear',
+  xDomain: [],
+  yDomain: [],
   onHover: () => {},
   onMouseOut: () => {},
+  formatValue: null,
+  formatTooltipData: ({ data, seriesLabels, index, label, color }) => {
+    return [
+      {
+        data: data[0],
+        label:
+          seriesLabels && seriesLabels.length ? seriesLabels[index] : label,
+        color: color[index],
+      },
+    ];
+  },
   emptyText:
     'There is currently no data available for the parameters selected. Please try a different combination.',
   isUTC: false,
@@ -82,8 +126,6 @@ const defaultProps = {
 class LineGraph extends Component {
   componentDidMount() {
     const {
-      data,
-      datasets,
       width,
       height,
       margin,
@@ -92,12 +134,6 @@ class LineGraph extends Component {
       showLegend,
       seriesLabels,
     } = this.props;
-
-    if (data.length > 0) {
-      this.totalLines = data[0].length - 1;
-    } else if (datasets.length > 0) {
-      this.totalLines = datasets.length;
-    }
 
     this.emptyContainer = d3
       .select(`#${containerId} .bx--line-graph-empty-text`)
@@ -139,25 +175,45 @@ class LineGraph extends Component {
   }
 
   shouldComponentUpdate(nextProps) {
-    return (
-      this.props.data !== nextProps.data ||
-      this.props.datasets !== nextProps.datasets
-    );
+    return !_.isEqual(this.props, nextProps);
   }
 
   componentWillUpdate(nextProps) {
     if (this.x) {
-      const data =
-        nextProps.data.length > 0
-          ? nextProps.data
-          : _.flatten(nextProps.datasets);
-      this.x.domain(d3.extent(data, d => d[d.length - 1]));
-      this.y.domain([0, d3.max(data, d => d3.max(d.slice(0, d.length - 1)))]);
+      const { yDomain, isXTime, isUTC, datasets, data } = nextProps;
+      const flatData = data.length > 0 ? data : _.flatten(datasets);
+      const chartData = flatData.map(d => {
+        return {
+          date: isXTime || isUTC ? new Date(d[1]) : d[1],
+          value: d[0],
+        };
+      });
 
-      this.updateEmptyState(
-        nextProps.data.length > 0 ? nextProps.data : nextProps.datasets
-      );
+      this.x.domain(d3.extent(chartData, d => d.date));
+      if (nextProps.scaleType === 'log') {
+        this.y.domain([
+          yDomain[0] || 0.1,
+          yDomain[0] || d3.max(chartData, d => d.value),
+        ]);
+        this.yAxis.scale(this.y.nice());
+      } else {
+        this.y.domain([
+          yDomain[0] || 0,
+          yDomain[0] || d3.max(chartData, d => d.value),
+        ]);
+      }
+      this.updateEmptyState(data);
       this.updateData(nextProps);
+    }
+  }
+
+  componentDidUpdate(prevProps) {
+    const { showLegend, seriesLabels } = this.props;
+
+    // If seriesLabels change, remove legend and re-render
+    if (showLegend && seriesLabels.length !== prevProps.seriesLabels.length) {
+      this.svg.selectAll('.legend').remove();
+      this.renderLegend();
     }
   }
 
@@ -177,24 +233,9 @@ class LineGraph extends Component {
   }
 
   updateData(nextProps) {
-    const {
-      data,
-      datasets,
-      axisOffset,
-      xAxisLabel,
-      yAxisLabel,
-      animateAxes,
-    } = nextProps;
+    const { axisOffset, xAxisLabel, yAxisLabel, animateAxes } = nextProps;
 
-    for (var i = 0; i < this.totalLines; i++) {
-      this.svg.selectAll(`g[data-line="${i}"]`).remove();
-    }
-
-    if (data.length > 0) {
-      this.totalLines = data[0].length - 1;
-    } else if (datasets.length > 0) {
-      this.totalLines = datasets.length;
-    }
+    this.svg.selectAll('g.line-container').remove();
 
     if (animateAxes) {
       this.svg
@@ -204,7 +245,10 @@ class LineGraph extends Component {
         .selectAll('.bx--axis--x .tick text')
         .attr('y', axisOffset)
         .style('text-anchor', 'end')
-        .attr('transform', `rotate(-65)`);
+        .style(
+          'transform',
+          `translate3d(-${axisOffset}px, 5px, 0) rotate(-60deg)`
+        );
 
       this.svg
         .select('.bx--axis--y')
@@ -219,7 +263,10 @@ class LineGraph extends Component {
         .selectAll('.bx--axis--x .tick text')
         .attr('y', axisOffset)
         .style('text-anchor', 'end')
-        .attr('transform', `rotate(-65)`);
+        .style(
+          'transform',
+          `translate3d(-${axisOffset}px, 5px, 0) rotate(-60deg)`
+        );
 
       this.svg
         .select('.bx--axis--y')
@@ -253,7 +300,7 @@ class LineGraph extends Component {
           ? 30 + _.max(seriesLabels.map(l => l.length)) * 8
           : 0));
 
-    this.svg.selectAll('*').remove();
+    this.svg.remove();
 
     this.svg = d3
       .select(`#${containerId} svg`)
@@ -272,65 +319,98 @@ class LineGraph extends Component {
       data,
       datasets,
       timeFormat,
+      formatValue,
       isUTC,
       isXTime,
       showLegend,
       seriesLabels,
+      scaleType,
+      yDomain,
+      yAxisTicks,
+      xDomain,
+      timeFormatLocale,
     } = this.props;
 
     this.updateEmptyState(data.length > 0 ? data : datasets);
 
     const flatData = data.length > 0 ? data : _.flatten(datasets);
+    const chartData = flatData.map(d => {
+      return {
+        date: isXTime || isUTC ? new Date(d[1]) : d[1],
+        value: d[0],
+      };
+    });
 
     if (isUTC) {
-      this.x = d3
-        .scaleUtc()
-        .range([0, this.width])
-        .domain(d3.extent(flatData, d => d[d.length - 1]));
+      this.x = d3.scaleUtc();
     } else if (isXTime) {
-      this.x = d3
-        .scaleTime()
-        .range([0, this.width])
-        .domain(d3.extent(flatData, d => d[d.length - 1]));
+      this.x = d3.scaleTime();
     } else {
-      this.x = d3
-        .scaleLinear()
-        .range([0, this.width])
-        .domain(d3.extent(flatData, d => d[d.length - 1]));
+      this.x = d3.scaleLinear();
     }
 
-    this.y = d3
-      .scaleLinear()
-      .range([this.height, 0])
-      .domain([
-        0,
-        d3.max(flatData, d => d3.max(d.slice(0, d.length - 1))) || 10,
-      ]);
+    this.x.range([0, this.width]).domain(d3.extent(chartData, d => d.date));
+
+    if (xDomain.length === 2) {
+      this.x.domain([xDomain[0], xDomain[1]]);
+    }
+
+    if (scaleType === 'log') {
+      this.y = d3
+        .scaleLog()
+        .range([this.height, 0])
+        .domain([
+          yDomain[0] || 0.1,
+          yDomain[1] || d3.max(chartData, d => d.value),
+        ]);
+    } else {
+      this.y = d3
+        .scaleLinear()
+        .range([this.height, 0])
+        .domain([
+          yDomain[0] || 0,
+          yDomain[1] || d3.max(chartData, d => d.value),
+        ]);
+    }
 
     this.line = d3
       .line()
-      .x(d => this.x(d[d.length - 1]))
-      .y(d => this.y(d[this.count]))
-      .defined(d => !isNaN(d[this.count]));
+      .x(d => this.x(d[1]))
+      .y(d => this.y(d[0]))
+      .defined(d => !isNaN(d[0]));
+
+    if (timeFormatLocale) {
+      d3.timeFormatDefaultLocale(timeFormatLocale);
+    }
+
+    const tickFormat = isUTC
+      ? d3.utcFormat(timeFormat)
+      : d3.timeFormat(timeFormat);
 
     this.xAxis = d3
       .axisBottom()
-      .scale(this.x)
+      .scale(this.x.nice())
       .tickSize(0)
-      .tickFormat(isXTime ? d3.timeFormat(timeFormat) : null);
+      .tickFormat(isXTime ? tickFormat : null);
 
     this.yAxis = d3
       .axisLeft()
-      .ticks(4)
+      .scale(this.y.nice())
       .tickSize(-this.width)
-      .scale(this.y.nice());
+      .ticks(yAxisTicks);
+
+    if (scaleType === 'log') {
+      this.yAxis.tickFormat(d3.format('~s'));
+    } else if (formatValue !== null) {
+      this.yAxis.tickFormat(formatValue);
+    }
 
     this.renderAxes();
     this.renderLabels();
     this.renderOverlay();
 
     if (this.x) {
-      this.renderLine();
+      this.renderLines();
     }
 
     if (showLegend && seriesLabels.length > 0) {
@@ -356,8 +436,11 @@ class LineGraph extends Component {
       .call(this.xAxis)
       .selectAll('text')
       .attr('y', axisOffset)
-      .style('text-anchor', 'end')
-      .attr('transform', `rotate(-65)`);
+      .attr('text-anchor', 'end')
+      .style(
+        'transform',
+        `translate3d(-${axisOffset}px, 5px, 0) rotate(-60deg)`
+      );
 
     this.updateStyles();
   }
@@ -390,16 +473,17 @@ class LineGraph extends Component {
       .attr('text-anchor', 'middle');
   }
 
-  renderLine() {
+  renderLines() {
     const { data, datasets, drawLine } = this.props;
     const color = d3.scaleOrdinal(this.props.color);
     const hasData = data.length > 0;
     const numLines = hasData ? data[0].length - 1 : datasets.length;
 
-    this.count = 0;
+    const lineContainer = this.svg.append('g').attr('class', 'line-container');
+
     if (hasData || _.max(datasets.map(d => d.length)) > 0) {
       for (let i = 0; i < numLines; i++) {
-        const path = this.svg
+        const path = lineContainer
           .append('g')
           .attr('data-line', i)
           .datum(hasData ? data : datasets[i])
@@ -411,7 +495,7 @@ class LineGraph extends Component {
           .attr('pointer-events', 'none')
           .attr('d', this.line);
 
-        var totalLength = path.node().getTotalLength();
+        let totalLength = path.node().getTotalLength();
 
         if (drawLine) {
           path
@@ -425,14 +509,22 @@ class LineGraph extends Component {
             .attr('stroke-dasharray', 0 + ' ' + totalLength)
             .attr('stroke-dasharray', totalLength + ' ' + 0);
         }
-
-        this.count += hasData ? 1 : 0;
       }
     }
   }
 
   renderOverlay() {
-    this.svg
+    const { hoverOverlay } = this.props;
+    if (hoverOverlay) {
+      this.overlay = this.svg
+        .append('rect')
+        .attr('class', 'bx--graph-overlay')
+        .attr('fill', '#3d70b2')
+        .style('opacity', '.1')
+        .attr('height', this.height);
+    }
+
+    const overlayEl = this.svg
       .append('rect')
       .attr('width', this.width)
       .attr('height', this.height)
@@ -443,48 +535,66 @@ class LineGraph extends Component {
         this.onMouseMove();
       })
       .on('mouseout', () => {
-        this.onMouseOut();
+        this.onMouseOut(overlayEl.node());
       });
   }
 
   renderLegend() {
     const { seriesLabels } = this.props;
-    let legendRectSize = 18;
-    let legendSpacing = 4;
+    let legendRectSize = 10;
+    let legendXSpacing = 10;
+    let legendYSpacing = 14;
 
-    let legend = this.svg
+    const legendContainer = this.svg
+      .append('g')
+      .attr('class', 'legend-container')
+      .style('transform', `translateX(650px)`);
+
+    const legend = legendContainer
       .selectAll('.legend')
       .data(seriesLabels)
       .enter()
       .append('g')
       .attr('class', 'legend')
       .attr('transform', (d, i) => {
-        const h = legendRectSize + legendSpacing;
-        const offset = h * seriesLabels.length / 2;
-        const horz = this.width + 10;
+        const h = legendRectSize + legendYSpacing;
+        const offset = (h * seriesLabels.length) / 2;
         const vert = i * h - offset + 50;
-        return `translate(${horz},${vert})`;
+        return `translate(0, ${vert})`;
       });
 
     legend
       .append('rect')
       .attr('width', legendRectSize)
       .attr('height', legendRectSize)
+      .attr('x', 0)
+      .attr('y', 0)
       .style('fill', (d, i) => this.props.color[i])
       .style('stroke', (d, i) => this.props.color[i]);
 
     legend
       .append('text')
-      .attr('x', legendRectSize + legendSpacing)
-      .attr('y', legendRectSize - legendSpacing)
+      .attr('x', legendRectSize + legendXSpacing)
+      .attr('y', legendRectSize)
       .text((d, i) => seriesLabels[i]);
   }
 
-  onMouseOut() {
+  onMouseOut(overlayNode) {
+    const { hoverOverlay, data, datasets } = this.props;
+    const overlayNodeBBox = overlayNode.getBBox();
+    const overlayPos = d3.mouse(overlayNode);
+
     if (
-      this.props.data.length > 2 ||
-      _.max(this.props.datasets.map(d => d.length)) > 2
+      overlayPos.every(v => v > 0) &&
+      (overlayPos[0] < overlayNodeBBox.width &&
+        overlayPos[1] < overlayNodeBBox.height)
     ) {
+      return;
+    }
+    if (hoverOverlay) {
+      this.overlay.style('display', 'none');
+    }
+    if (data.length > 2 || _.max(datasets.map(d => d.length)) > 2) {
       this.props.onMouseOut();
       if (this.tooltipId) {
         ReactDOM.unmountComponentAtNode(this.tooltipId);
@@ -493,7 +603,7 @@ class LineGraph extends Component {
   }
 
   onMouseMove() {
-    if (!this.id) return null;
+    if (!this.svgNode) return null;
 
     const {
       margin,
@@ -506,17 +616,18 @@ class LineGraph extends Component {
       labelOffsetX,
       isXTime,
       seriesLabels,
+      hoverOverlay,
+      formatTooltipData,
+      multiValueTooltip,
     } = this.props;
 
     if (data.length > 2 || _.max(datasets.map(d => d.length)) > 2) {
-      const bisectDate = d3.bisector(function(d) {
-        return d[d.length - 1];
-      }).right;
-      const mouse = d3.mouse(this.id)[0] - margin.left;
+      const bisectDate = d3.bisector(d => d[d.length - 1]).right;
+      const mouse = d3.mouse(this.svgNode)[0] - margin.left;
       const timestamp = this.x.invert(mouse);
       let d, mouseData, tooltipHeading, tooltipData;
       if (data.length > 0) {
-        const index = bisectDate(data, timestamp);
+        const index = bisectDate(data, timestamp, 1);
         const d0 = data[index - 1];
         const d1 = data[index];
 
@@ -525,9 +636,9 @@ class LineGraph extends Component {
             timestamp - d0[d0.length - 1] > d1[d1.length - 1] - timestamp
               ? d1
               : d0;
-
           mouseData = {
             data: d,
+            datasets,
             pageX: d3.event.pageX,
             pageY: d3.event.pageY,
             graphX: this.x(d[d.length - 1]),
@@ -535,22 +646,42 @@ class LineGraph extends Component {
             graphYArray: d.slice(0, -1).map(this.y),
           };
 
-          tooltipData = _.dropRight(d).map((p, i) => ({
-            data: _.round(p, 2),
-            label: seriesLabels[i],
-            color: color[i],
-          }));
+          if (hoverOverlay) {
+            const startDate = d0[d0.length - 1];
+            const endDate = d1[d1.length - 1];
+            const x0 = this.x(d[d.length - 1]);
+            let overlayWidth = Math.abs(this.x(endDate) - this.x(startDate));
+            let xPos = Math.min(Math.max(0, x0 - overlayWidth / 2), this.width);
+            if (d[d.length - 1] === data[0][1]) {
+              overlayWidth = overlayWidth / 2 + x0;
+            } else if (d[d.length - 1] === data[data.length - 1][1]) {
+              overlayWidth = overlayWidth / 2 + this.width - x0;
+            }
+            this.overlay
+              .style('display', 'inherit')
+              .attr('width', overlayWidth)
+              .attr('x', xPos);
+          }
 
           tooltipHeading =
-            d.length > 2
+            d.length > 2 || multiValueTooltip
               ? isXTime
                 ? d3.timeFormat(timeFormat)(d[d.length - 1])
                 : d[d.length - 1]
               : null;
+
+          tooltipData = formatTooltipData(
+            Object.assign(mouseData, {
+              index,
+              label: tooltipHeading,
+              seriesLabels,
+              color,
+            })
+          );
         }
       } else {
         const mouseX = this.x(timestamp);
-        const mouseY = d3.mouse(this.id)[1] - margin.top;
+        const mouseY = d3.mouse(this.svgNode)[1] - margin.top;
         const distances = [];
         d = _.sortBy(_.flatten(datasets), a => {
           const aDist =
@@ -561,8 +692,44 @@ class LineGraph extends Component {
         })[0];
         const i = datasets.findIndex(set => set.includes(d));
 
+        if (hoverOverlay) {
+          const x0 = this.x(d[d.length - 1]);
+          const endDate = d[d.length - 1];
+          const endDateIdx = datasets[i].findIndex(
+            v => v[v.length - 1] === endDate
+          );
+          const datasetLength = datasets
+            .map(v => v.length)
+            .sort((a, b) => b - a)
+            .shift();
+          let startSet, startDate, overlayWidth, xPos;
+          if (endDateIdx === 0) {
+            startSet = datasets[i][1];
+            startDate = startSet[startSet.length - 1];
+            overlayWidth = Math.abs(this.x(endDate) - this.x(startDate));
+            xPos = Math.min(Math.max(0, x0 - overlayWidth / 2), this.width);
+            overlayWidth = Math.min(overlayWidth, overlayWidth / 2 + x0);
+          } else {
+            startSet = datasets[i][Math.max(endDateIdx - 1, 0)];
+            startDate = startSet[startSet.length - 1];
+            overlayWidth = Math.abs(this.x(endDate) - this.x(startDate));
+            xPos = Math.min(Math.max(0, x0 - overlayWidth / 2), this.width);
+            if (endDateIdx === datasetLength - 1) {
+              overlayWidth = Math.min(
+                overlayWidth,
+                overlayWidth / 2 + this.width - x0
+              );
+            }
+          }
+          this.overlay
+            .style('display', 'inherit')
+            .attr('width', overlayWidth)
+            .attr('x', xPos);
+        }
+
         mouseData = {
           data: d,
+          datasets,
           pageX: d3.event.pageX,
           pageY: d3.event.pageY,
           graphX: this.x(d[d.length - 1]),
@@ -574,13 +741,16 @@ class LineGraph extends Component {
           ? d3.timeFormat(timeFormat)(d[d.length - 1])
           : d[d.length - 1];
 
-        tooltipHeading = d.length > 2 ? xVal : null;
+        tooltipHeading = d.length > 2 || multiValueTooltip ? xVal : null;
 
-        tooltipData = _.dropRight(d).map(p => ({
-          data: _.round(p, 2),
-          label: tooltipHeading ? seriesLabels[i] : xVal,
-          color: color[i],
-        }));
+        tooltipData = formatTooltipData(
+          Object.assign(mouseData, {
+            index: i,
+            label: tooltipHeading,
+            seriesLabels,
+            color,
+          })
+        );
       }
 
       this.props.onHover(mouseData);
@@ -595,8 +765,7 @@ class LineGraph extends Component {
           .node()
           .getBoundingClientRect();
         const offset = -tooltipSize.width / 2;
-        d3
-          .select(this.tooltipId)
+        d3.select(this.tooltipId)
           .style('position', 'relative')
           .style('left', `${mouseData.graphX + labelOffsetX + offset}px`)
           .style(
@@ -613,7 +782,7 @@ class LineGraph extends Component {
   render() {
     const { id, containerId } = this.props;
     if (this.x) {
-      this.renderLine();
+      this.renderLines();
     }
 
     return (
@@ -622,7 +791,7 @@ class LineGraph extends Component {
         id={containerId}
         style={{ position: 'relative' }}>
         <p className="bx--line-graph-empty-text" />
-        <svg id={id} ref={id => (this.id = id)} />
+        <svg id={id} ref={node => (this.svgNode = node)} />
         <div id={`${id}-tooltip`} ref={id => (this.tooltipId = id)} />
       </div>
     );
