@@ -99,19 +99,38 @@ class NegativeBarGraph extends Component {
 
   componentWillUpdate(nextProps) {
     if (this.yScale) {
+      const dataLength = d3.max(nextProps.data, d => d[0].length);
       this.yScale.domain(nextProps.data.map(d => d[1]));
 
-      if (this.isGrouped) {
-        const dataLength = nextProps.data[0][0].length;
-        this.yScale1
-          .rangeRound([this.yScale.bandwidth(), 0])
-          .domain(d3.range(dataLength));
-        this.xScale.domain(
-          d3.extent(
-            nextProps.data.reduce((acc, item) => acc.concat(item[0]), [])
-          )
-        );
+      if (dataLength > 1) {
+        if (!this.isGrouped) {
+          this.isGrouped = true;
+
+          this.yScale1 = d3
+            .scaleBand()
+            .rangeRound([this.yScale.bandwidth(), 0])
+            .domain(d3.range(dataLength))
+            .padding(0.1);
+          this.xScale = d3
+            .scaleLinear()
+            .range([0, this.width])
+            .domain(
+              d3.extent(
+                nextProps.data.reduce((acc, item) => acc.concat(item[0]), [])
+              )
+            );
+        } else {
+          this.yScale1
+            .rangeRound([this.yScale.bandwidth(), 0])
+            .domain(d3.range(dataLength));
+          this.xScale.domain(
+            d3.extent(
+              nextProps.data.reduce((acc, item) => acc.concat(item[0]), [])
+            )
+          );
+        }
       } else {
+        this.isGrouped = false;
         this.xScale.domain(d3.extent(nextProps.data.map(d => d[0][0])));
       }
 
@@ -412,7 +431,10 @@ class NegativeBarGraph extends Component {
       const barWidth = parseFloat(mouseData.rect.attr('width'));
       const multiplicator = mouseData.data[0] < 0 ? -1 : 1;
       const leftPos =
-        this.xScale(0) + labelOffsetX - offsetX + barWidth * multiplicator / 2;
+        this.xScale(0) +
+        labelOffsetX -
+        offsetX +
+        (barWidth * multiplicator) / 2;
       const topPos =
         -this.height -
         margin.top -
@@ -424,8 +446,7 @@ class NegativeBarGraph extends Component {
           ? this.yScale1.bandwidth() / 2
           : this.yScale.bandwidth() / 2);
 
-      d3
-        .select(this.tooltipId)
+      d3.select(this.tooltipId)
         .style('position', 'relative')
         .style('z-index', 1)
         .style('left', `${leftPos}px`)
