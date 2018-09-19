@@ -12,6 +12,9 @@ const propTypes = {
   timeFormat: PropTypes.string,
   xAxisLabel: PropTypes.string,
   yAxisLabel: PropTypes.string,
+  id: PropTypes.string,
+  containerId: PropTypes.string,
+  emptyText: PropTypes.string,
 };
 
 const defaultProps = {
@@ -29,6 +32,11 @@ const defaultProps = {
   timeFormat: '%b',
   xAxisLabel: 'X Axis',
   yAxisLabel: 'Y Axis',
+  id: 'container',
+  containerId: 'graph-container',
+  emptyText:
+    'There is currently no data available for the parameters ' +
+    'selected. Please try a different combination.',
 };
 
 class ScatterPlot extends Component {
@@ -46,9 +54,19 @@ class ScatterPlot extends Component {
 
   componentDidMount() {
     const { width, height, margin } = this.state;
+    const { containerId, emptyText } = this.props;
+
+    this.emptyContainer = d3
+      .select(`#${containerId} .bx--scatter-plot-empty-text`)
+      .text(emptyText)
+      .style('position', 'absolute')
+      .style('top', '50%')
+      .style('left', '50%')
+      .style('text-align', 'center')
+      .style('transform', 'translate(-50%, -50%)');
 
     this.svg = d3
-      .select(this.refs.container)
+      .select(`#${containerId} svg`)
       .attr('class', 'bx--graph')
       .attr('width', width)
       .attr('height', height)
@@ -64,8 +82,68 @@ class ScatterPlot extends Component {
     }, this.initialRender);
   }
 
+  componentDidUpdate(prevProps) {
+    const { showLegend, seriesLabels, data } = this.props;
+
+    // If seriesLabels change, remove legend and re-render
+    if (showLegend && seriesLabels.length !== prevProps.seriesLabels.length) {
+      // this.svg.selectAll('.legend').remove();
+    }
+
+    this.updateEmptyState(data);
+  }
+
+  updateData(nextProps) {
+    const { axisOffset, xAxisLabel, yAxisLabel } = nextProps;
+
+    this.svg.selectAll('g.line-container').remove();
+
+    this.svg
+      .select('.bx--axis--x')
+      .transition()
+      .call(this.xAxis)
+      .selectAll('.bx--axis--x .tick text')
+      .attr('y', axisOffset)
+      .style('text-anchor', 'end')
+      .style(
+        'transform',
+        `translate3d(-${axisOffset}px, 5px, 0) rotate(-60deg)`
+      );
+
+    this.svg
+      .select('.bx--axis--y')
+      .transition()
+      .call(this.yAxis)
+      .selectAll('text')
+      .attr('x', -axisOffset);
+
+    this.svg.select('.bx--axis--y .bx--graph-label').text(yAxisLabel);
+    this.svg.select('.bx--axis--x .bx--graph-label').text(xAxisLabel);
+
+    this.updateStyles();
+  }
+
+  updateStyles() {
+    this.svg.selectAll('.bx--axis--y path').style('display', 'none');
+    this.svg.selectAll('.bx--axis path').attr('stroke', '#5A6872');
+    this.svg.selectAll('.tick line').attr('stroke', '#5A6872');
+    this.svg.selectAll('.tick text').attr('fill', '#5A6872');
+  }
+
+  updateEmptyState(data) {
+    if (!data.length) {
+      this.svg.style('opacity', '.3');
+      this.emptyContainer.style('display', 'inline-block');
+    } else {
+      this.svg.style('opacity', '1');
+      this.emptyContainer.style('display', 'none');
+    }
+  }
+
   initialRender() {
     const { data, width, height } = this.state;
+
+    this.updateEmptyState(data);
 
     this.x = d3
       .scaleBand()
@@ -80,7 +158,6 @@ class ScatterPlot extends Component {
     this.renderAxes();
     this.renderLabels();
     this.renderPoints();
-    this.renderOverlay();
   }
 
   renderAxes() {
@@ -153,13 +230,16 @@ class ScatterPlot extends Component {
   renderPoints() {
     const { data } = this.state;
 
-    this.svg
+    const barContainer = this.svg
       .append('g')
-      .attr('class', 'scatter-container')
+      .attr('class', 'scatter-container');
+
+    barContainer
       .selectAll('circle')
       .data(data)
       .enter()
       .append('circle')
+      .attr('data-circle', (d, i) => i)
       .attr('class', 'circle')
       .attr('cx', d => this.x(d[1]))
       .attr('cy', d => this.y(d[0]))
@@ -168,41 +248,52 @@ class ScatterPlot extends Component {
       .transition()
       .delay((d, i) => i * 35)
       .attr('r', 4);
+
+    barContainer
+      .selectAll('circle')
+      .on('mousemove', (d, i) => this.onMouseMove(d, i))
+      .on('mouseout', (d, i) => this.onMouseOut(d, i));
   }
 
-  renderOverlay() {
-    const { width, height, data } = this.state;
+  onMouseOut(d, i) {
+    const circle = this.svg.select(`circle[data-circle="${i}"]`);
 
-    this.svg
-      .append('rect')
-      .attr('width', width)
-      .attr('height', height)
-      .attr('class', 'overlay')
-      .style('fill', 'none')
-      .style('pointer-events', 'all')
-      .on('mousemove', () => {
-        this.onMouseMove(data);
-      });
+    circle
+      .transition()
+      .duration(500)
+      .attr('fill', '#00a68f');
   }
 
-  onMouseMove(data) {
-    const { margin } = this.state;
-    const bisectDate = d3.bisector(function(d) {
-      return d[1];
-    }).right;
+  onMouseMove(d, i) {
+    const { timeFormat } = this.props;
 
-    const mouse = d3.mouse(this.refs.container)[0] - margin.left;
-    const timestamp = this.x.invert(mouse);
-    const index = bisectDate(data, timestamp);
-    const d0 = data[index - 1];
-    const d1 = data[index];
-    const d = timestamp - d0[1] > d1[1] - timestamp ? d1 : d0;
+    const mouseData = {
+      data: d,
+      index: i,
+    };
+    const circle = this.svg.select(`circle[data-circle="${i}"]`);
+    circle.attr('fill', d3.color(circle.attr('fill')).darker());
 
-    this.props.onHover(d);
+    if (timeFormat) {
+      const format = d3.timeFormat(timeFormat);
+      Object.assign(mouseData, { label: format(d[1]) });
+    }
+
+    this.props.onHover(mouseData);
   }
 
   render() {
-    return <svg ref="container" />;
+    const { containerId, id } = this.props;
+    return (
+      <div
+        className="bx--graph-container"
+        id={containerId}
+        style={{ position: 'relative' }}>
+        <p className="bx--scatter-plot-empty-text" />
+        <svg id={id} ref={node => (this.svgNode = node)} />
+        {/*<div id={`${id}-tooltip`} ref={id => (this.tooltipId = id)} />*/}
+      </div>
+    );
   }
 }
 

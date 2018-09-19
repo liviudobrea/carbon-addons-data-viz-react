@@ -98,7 +98,7 @@ storiesOf('BubbleChart', module)
     `
       Bubble Chart.
     `,
-    () => <BubbleChart data={data} onHover={action('Hover')} {...props} />
+    () => <BubbleChart onHover={action('Hover')} {...props} />
   )
   .addWithInfo(
     'Even Spacing',
