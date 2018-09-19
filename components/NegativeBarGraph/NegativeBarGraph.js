@@ -243,7 +243,7 @@ class NegativeBarGraph extends Component {
 
     const barContainer = this.svg.append('g').attr('class', 'bar-container');
 
-    if (data.length > 1) {
+    if (data.length) {
       if (this.isGrouped) {
         this.count = 0;
         barContainer
@@ -533,7 +533,7 @@ class NegativeBarGraph extends Component {
   }
 
   updateEmptyState(data) {
-    if (data.length < 2) {
+    if (!data.length) {
       this.svg.style('opacity', '.3');
       this.emptyContainer.style('display', 'inline-block');
     } else {

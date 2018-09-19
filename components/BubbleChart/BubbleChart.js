@@ -338,7 +338,7 @@ class BubbleChart extends Component {
   }
 
   updateEmptyState(data) {
-    if (data.length < 2) {
+    if (!data.length) {
       this.svg.style('opacity', '.3');
       this.emptyContainer.style('display', 'inline-block');
     } else {
