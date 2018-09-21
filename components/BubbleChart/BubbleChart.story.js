@@ -4,7 +4,7 @@ import BubbleChart from './BubbleChart';
 
 class UpdatingBubbleChartContainer extends PureComponent {
   state = {
-    data: this.createData(6).sort((a, b) => b[0] - a[0]),
+    data: createData(6).sort((a, b) => b[0] - a[0]),
   };
 
   updateInterval;
@@ -17,26 +17,12 @@ class UpdatingBubbleChartContainer extends PureComponent {
     }, 2500);
   }
 
-  createData(num) {
-    let data = [];
-    for (let i = 0; i < num; i++) {
-      let tempArr = [];
-      let d = new Date();
-      let randomNum = Math.floor(Math.random() * 1000 + 1);
-      d = d.setDate(d.getDate() - i * 30);
-      tempArr.push(randomNum, d);
-      data.push(tempArr);
-    }
-
-    return data;
-  }
-
   componentWillUnmount() {
     clearInterval(this.updateInterval);
   }
 
   updateData(i) {
-    let data = this.createData(6).sort((a, b) => b[0] - a[0]);
+    let data = createData(6).sort((a, b) => b[0] - a[0]);
     action('Update');
     this.setState({
       data,
@@ -86,12 +72,14 @@ const props = {
     bottom: 70,
     left: 65,
   },
+  data,
   height: 450,
   width: 800,
   labelOffset: 55,
   axisOffset: 16,
   xAxisLabel: 'Airline',
-  formatValue: value => `$${value / 10}`,
+  formatValue: null,
+  timeFormat: null,
   formatTooltipData: ({ data, label, index, circle }) => {
     return [
       {
@@ -102,35 +90,22 @@ const props = {
       },
     ];
   },
-  timeFormat: null,
 };
 
-let resizeInterval;
 storiesOf('BubbleChart', module)
-  .addDecorator(next => {
-    clearInterval(resizeInterval);
-    return next();
-  })
   .addWithInfo(
     'Default',
     `
       Bubble Chart.
     `,
-    () => <BubbleChart data={data} onHover={action('Hover')} {...props} />
+    () => <BubbleChart onHover={action('Hover')} {...props} />
   )
   .addWithInfo(
     'Even Spacing',
     `
       Bubble Chart.
     `,
-    () => (
-      <BubbleChart
-        data={data}
-        onHover={action('Hover')}
-        spacing="even"
-        {...props}
-      />
-    )
+    () => <BubbleChart onHover={action('Hover')} spacing="even" {...props} />
   )
   .addWithInfo(
     'Resizing',
@@ -138,33 +113,48 @@ storiesOf('BubbleChart', module)
       Auto resizing Bubble Chart.
     `,
     () => {
-      let chartRef;
-      const Chart = React.createElement(
-        BubbleChart,
-        {
-          ref: element => (chartRef = element),
-          data,
-          onHover: action('Hover'),
-          ...props,
-        },
-        null
-      );
+      class ResizingChart extends PureComponent {
+        state = {
+          data: createData(6).sort((a, b) => b[0] - a[0]),
+        };
 
-      resizeInterval = setInterval(() => {
-        if (chartRef && typeof chartRef.resize === 'function') {
-          const height = Math.max(
-            Math.min(Math.random() * 1000, props.height),
-            300
-          );
-          const width = Math.max(
-            Math.min(Math.random() * 1000, props.width),
-            300
-          );
-          chartRef.resize(height, width);
+        chartRef = React.createRef();
+        resizeInterval;
+
+        componentDidMount() {
+          this.resizeInterval = setInterval(() => {
+            const height = Math.max(
+              Math.min(Math.random() * 1000, props.height),
+              300
+            );
+            const width = Math.max(
+              Math.min(Math.random() * 1000, props.width),
+              300
+            );
+            this.setState({ data: createData(6).sort((a, b) => b[0] - a[0]) });
+            this.chartRef.current.resize(height, width);
+          }, 2500);
         }
-      }, 5000);
 
-      return Chart;
+        componentWillUnmount() {
+          clearInterval(this.resizeInterval);
+        }
+
+        render() {
+          const { data } = this.state;
+
+          return (
+            <BubbleChart
+              ref={this.chartRef}
+              {...props}
+              data={data}
+              spacing="even"
+            />
+          );
+        }
+      }
+
+      return <ResizingChart />;
     }
   )
   .addWithInfo(
