@@ -150,8 +150,11 @@ class NegativeBarGraph extends Component {
 
     this.updateEmptyState(data);
 
-    const dataLength = data[0][0].length;
-    this.isGrouped = dataLength > 1;
+    let dataLength = 0;
+    if (data.length) {
+      dataLength = data[0][0].length;
+      this.isGrouped = dataLength > 1;
+    }
 
     this.yScale = d3
       .scaleBand()
