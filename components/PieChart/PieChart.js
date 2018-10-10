@@ -15,6 +15,7 @@ const propTypes = {
   onHover: PropTypes.func,
   showTotals: PropTypes.bool,
   showTooltip: PropTypes.bool,
+  emptyText: PropTypes.string,
 };
 
 const defaultProps = {
@@ -32,12 +33,27 @@ const defaultProps = {
   },
   color: ['#00a68f', '#3b1a40', '#473793', '#3c6df0', '#56D2BB'],
   id: 'graph-container',
+  emptyText:
+    'There is currently no data available for the parameters selected. ' +
+    'Please try a different combination.',
   showTotals: false,
   showTooltip: true,
 };
 
 class PieChart extends Component {
   componentDidMount() {
+    const { id, emptyText } = this.props;
+
+    this.emptyContainer = d3
+      .select(`#${id} .bx--pie-graph-empty-text`)
+      .text(emptyText)
+      .style('position', 'absolute')
+      .style('top', '50%')
+      .style('left', '50%')
+      .style('text-align', 'center')
+      .style('width', '100%')
+      .style('transform', 'translate(-50%, -50%)');
+
     this.renderSVG(this.props);
   }
 
@@ -49,6 +65,16 @@ class PieChart extends Component {
 
   shouldComponentUpdate(nextProps) {
     return !_.isEqual(this.props, nextProps);
+  }
+
+  updateEmptyState(data) {
+    if (!data.length) {
+      this.svg.style('opacity', '.3');
+      this.emptyContainer.style('display', 'inline-block');
+    } else {
+      this.svg.style('opacity', '1');
+      this.emptyContainer.style('display', 'none');
+    }
   }
 
   renderSVG(props) {
@@ -63,8 +89,25 @@ class PieChart extends Component {
       showTooltip,
     } = props;
 
-    const width = props.radius * 2;
-    const height = props.radius * 2 + 24;
+    if (this.svg) {
+      const paths = this.svg.selectAll('path');
+      if (paths.size()) {
+        this.svg.remove();
+      }
+    }
+
+    const width = radius * 2;
+    const height = radius * 2 + 24;
+
+    this.svg = d3
+      .select(`#${id} svg`)
+      .attr('width', width)
+      .attr('height', height)
+      .append('g')
+      .attr('class', 'group-container')
+      .attr('transform', `translate(${width / 2}, ${height / 2})`);
+
+    this.updateEmptyState(props.data);
 
     const color = d3.scaleOrdinal(props.color);
     const tooltipId = this.tooltipId;
@@ -80,21 +123,6 @@ class PieChart extends Component {
       .arc()
       .outerRadius(radius)
       .innerRadius(radius - 40);
-
-    if (this.svg) {
-      const paths = this.svg.selectAll('path');
-      if (paths.size()) {
-        this.svg.remove();
-      }
-    }
-
-    this.svg = d3
-      .select(`#${id} svg`)
-      .attr('width', width)
-      .attr('height', height)
-      .append('g')
-      .attr('class', 'group-container')
-      .attr('transform', `translate(${width / 2}, ${height / 2})`);
 
     const arc = this.svg
       .selectAll('.arc')
@@ -229,6 +257,7 @@ class PieChart extends Component {
         id={id}
         style={{ position: 'relative', width, height }}>
         <div style={{ position: 'relative', width }}>
+          <p className="bx--pie-graph-empty-text" />
           <svg />
           <div className="bx--pie-tooltip" style={tooltipStyles}>
             <p className="bx--pie-value" style={valueStyles} />

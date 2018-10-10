@@ -105,7 +105,11 @@ storiesOf('PieChart', module)
 
         render() {
           const { radius } = this.state;
-          return <PieChart id="totals" {...props} radius={radius} showTotals />;
+          return (
+            <div style={{ width: 500 }}>
+              <PieChart id="totals" {...props} radius={radius} showTotals />
+            </div>
+          );
         }
       }
       return <PieResize />;
