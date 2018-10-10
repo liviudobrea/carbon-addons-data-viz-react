@@ -42,18 +42,7 @@ const defaultProps = {
 
 class PieChart extends Component {
   componentDidMount() {
-    const { id, emptyText, radius } = this.props;
-
-    const width = radius * 2;
-    const height = radius * 2 + 24;
-
-    this.svg = d3
-      .select(`#${id} svg`)
-      .attr('width', width)
-      .attr('height', height)
-      .append('g')
-      .attr('class', 'group-container')
-      .attr('transform', `translate(${width / 2}, ${height / 2})`);
+    const { id, emptyText } = this.props;
 
     this.emptyContainer = d3
       .select(`#${id} .bx--pie-graph-empty-text`)
@@ -100,6 +89,24 @@ class PieChart extends Component {
       showTooltip,
     } = props;
 
+    if (this.svg) {
+      const paths = this.svg.selectAll('path');
+      if (paths.size()) {
+        this.svg.remove();
+      }
+    }
+
+    const width = radius * 2;
+    const height = radius * 2 + 24;
+
+    this.svg = d3
+      .select(`#${id} svg`)
+      .attr('width', width)
+      .attr('height', height)
+      .append('g')
+      .attr('class', 'group-container')
+      .attr('transform', `translate(${width / 2}, ${height / 2})`);
+
     this.updateEmptyState(props.data);
 
     const color = d3.scaleOrdinal(props.color);
@@ -116,13 +123,6 @@ class PieChart extends Component {
       .arc()
       .outerRadius(radius)
       .innerRadius(radius - 40);
-
-    if (this.svg) {
-      const paths = this.svg.selectAll('path');
-      if (paths.size()) {
-        this.svg.remove();
-      }
-    }
 
     const arc = this.svg
       .selectAll('.arc')

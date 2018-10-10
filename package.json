@@ -1,6 +1,6 @@
 {
   "name": "@ibmtm/carbon-addons-data-viz-react",
-  "version": "0.1.8",
+  "version": "0.1.9",
   "description": "Carbon Data Visualization for React",
   "main": "cjs/index.js",
   "module": "es/index.js",
