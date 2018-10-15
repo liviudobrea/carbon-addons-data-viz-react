@@ -164,6 +164,55 @@ storiesOf('LineGraph', module)
     )
   )
   .addWithInfo(
+    'Resizing',
+    `
+      Resizing Line Graph.
+    `,
+    () => {
+      class ResizingLineGraph extends React.PureComponent {
+        state = { width: 800 };
+        resetInterval = null;
+
+        componentDidMount() {
+          this.resetInterval = setInterval(
+            () =>
+              this.setState({
+                width: Math.max(650, Math.random() * 100 * 10),
+              }),
+            3500
+          );
+        }
+
+        componentWillUnmount() {
+          clearInterval(this.resetInterval);
+          this.resetInterval = null;
+        }
+
+        render() {
+          const { width } = this.state;
+          return <LineGraph width={width} {...this.props} />;
+        }
+      }
+
+      return (
+        <ResizingLineGraph
+          datasets={createDataSets(4, 5).map(set =>
+            set.map((v, i) => [v[0], i])
+          )}
+          isXTime={false}
+          timeFormat="%m-%Y"
+          showLegend
+          hoverOverlay
+          multiValueTooltip
+          formatValue={v => `${v / 1000}k`}
+          onHover={action('Hover')}
+          onMouseOut={action('Mouseout')}
+          onBlur={action('Blur')}
+        />
+      );
+    }
+  )
+  .addWithInfo(
     'Updating without animating axes',
     `
       Line Graph without axes animation.
