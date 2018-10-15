@@ -15,6 +15,7 @@ const propTypes = {
   onHover: PropTypes.func,
   showTotals: PropTypes.bool,
   showTooltip: PropTypes.bool,
+  emptyText: PropTypes.string,
 };
 
 const defaultProps = {
@@ -32,16 +33,28 @@ const defaultProps = {
   },
   color: ['#00a68f', '#3b1a40', '#473793', '#3c6df0', '#56D2BB'],
   id: 'graph-container',
+  emptyText:
+    'There is currently no data available for the parameters selected. ' +
+    'Please try a different combination.',
   showTotals: false,
   showTooltip: true,
 };
 
 class PieChart extends Component {
   componentDidMount() {
-    this.width = this.props.radius * 2;
-    this.height = this.props.radius * 2 + 24;
+    const { id, emptyText } = this.props;
 
-    this.renderSVG();
+    this.emptyContainer = d3
+      .select(`#${id} .bx--pie-graph-empty-text`)
+      .text(emptyText)
+      .style('position', 'absolute')
+      .style('top', '50%')
+      .style('left', '50%')
+      .style('text-align', 'center')
+      .style('width', '100%')
+      .style('transform', 'translate(-50%, -50%)');
+
+    this.renderSVG(this.props);
   }
 
   componentWillReceiveProps(nextProps) {
@@ -54,7 +67,17 @@ class PieChart extends Component {
     return !_.isEqual(this.props, nextProps);
   }
 
-  renderSVG() {
+  updateEmptyState(data) {
+    if (!data.length) {
+      this.svg.style('opacity', '.3');
+      this.emptyContainer.style('display', 'inline-block');
+    } else {
+      this.svg.style('opacity', '1');
+      this.emptyContainer.style('display', 'none');
+    }
+  }
+
+  renderSVG(props) {
     const {
       data,
       radius,
@@ -64,8 +87,29 @@ class PieChart extends Component {
       onHover,
       showTotals,
       showTooltip,
-    } = this.props;
-    const color = d3.scaleOrdinal(this.props.color);
+    } = props;
+
+    if (this.svg) {
+      const paths = this.svg.selectAll('path');
+      if (paths.size()) {
+        this.svg.remove();
+      }
+    }
+
+    const width = radius * 2;
+    const height = radius * 2 + 24;
+
+    this.svg = d3
+      .select(`#${id} svg`)
+      .attr('width', width)
+      .attr('height', height)
+      .append('g')
+      .attr('class', 'group-container')
+      .attr('transform', `translate(${width / 2}, ${height / 2})`);
+
+    this.updateEmptyState(props.data);
+
+    const color = d3.scaleOrdinal(props.color);
     const tooltipId = this.tooltipId;
     const pie = d3
       .pie()
@@ -79,21 +123,6 @@ class PieChart extends Component {
       .arc()
       .outerRadius(radius)
       .innerRadius(radius - 40);
-
-    if (this.svg) {
-      const paths = this.svg.selectAll('path');
-      if (paths.size()) {
-        this.svg.remove();
-      }
-    }
-
-    this.svg = d3
-      .select(this.svgNode)
-      .attr('width', this.width)
-      .attr('height', this.height)
-      .append('g')
-      .attr('class', 'group-container')
-      .attr('transform', `translate(${this.width / 2}, ${this.height / 2})`);
 
     const arc = this.svg
       .selectAll('.arc')
@@ -115,7 +144,10 @@ class PieChart extends Component {
         return t => path(i(t));
       });
 
-    const totalAmount = data.reduce((acc, values) => (acc += values[1]), 0);
+    const totalAmount = data.reduce((acc, values) => {
+      acc += values[1];
+      return acc;
+    }, 0);
 
     if (showTotals) {
       d3.select(`#${id} .bx--pie-tooltip`).style('display', 'block');
@@ -126,8 +158,7 @@ class PieChart extends Component {
     this.svg
       .selectAll('path')
       .on('mouseover', function(d) {
-        d3
-          .select(this)
+        d3.select(this)
           .transition()
           .style('cursor', 'pointer')
           .attr('d', pathTwo);
@@ -151,34 +182,39 @@ class PieChart extends Component {
             .node()
             .getBoundingClientRect();
           const pos = path.centroid(d); //[x, y]
-          const leftPos = pos[0] + tooltipSize.width / 2 * pos[0] / 100;
-          const topPos = pos[1] + tooltipSize.height * pos[1] / 100;
-          d3
-            .select(tooltipId)
+          let leftPos = pos[0] + (tooltipSize.width * pos[0]) / 100;
+          let topPos = pos[1];
+          if (pos[1] < 0) {
+            topPos -= tooltipSize.height;
+          } else {
+            topPos += tooltipSize.height;
+          }
+          d3.select(tooltipId)
             .style('position', 'absolute')
             .style('top', `50%`)
             .style('left', `50%`)
-            .style('margin-left', `${leftPos}px`)
-            .style('margin-top', `${topPos}px`)
+            .style('transform', 'translate(-50%, -50%)')
             .style('width', `${tooltipSize.width}px`)
             .style('height', `${tooltipSize.height}px`)
-            .style('transform', 'translate(-50%, -50%)');
+            .selectAll('.bx--tooltip')
+            .style('left', `calc(${leftPos}px)`)
+            .style('top', `${topPos}px`);
         }
       })
       .on('mouseout', function() {
-        d3
-          .select(`#${id} .bx--pie-tooltip`)
-          .style('display', !showTotals && 'none');
-        d3
-          .select(this)
+        d3.select(`#${id} .bx--pie-tooltip`).style(
+          'display',
+          !showTotals && 'none'
+        );
+        d3.select(this)
           .transition()
           .attr('d', path);
         if (showTotals) {
           d3.select(`#${id} .bx--pie-tooltip`).style('display', 'block');
           d3.select(`#${id} .bx--pie-key`).text('Total');
-          d3
-            .select(`#${id} .bx--pie-value`)
-            .text(`${formatValue(totalAmount)}`);
+          d3.select(`#${id} .bx--pie-value`).text(
+            `${formatValue(totalAmount)}`
+          );
         }
 
         if (onHover) {
@@ -189,7 +225,7 @@ class PieChart extends Component {
   }
 
   render() {
-    const { id } = this.props;
+    const { id, radius } = this.props;
     const tooltipStyles = {
       display: 'none',
       position: 'absolute',
@@ -212,27 +248,23 @@ class PieChart extends Component {
       lineHeight: '1',
     };
 
-    this.renderSVG();
+    const width = radius * 2;
+    const height = radius * 2 + 24;
 
     return (
       <div
         className="bx--graph-container"
         id={id}
-        style={{
-          position: 'relative',
-          width: this.width,
-          height: this.height,
-        }}>
-        <svg ref={node => (this.svgNode = node)} />
-        <div className="bx--pie-tooltip" style={tooltipStyles}>
-          <p className="bx--pie-value" style={valueStyles} />
-          <p className="bx--pie-key" style={keyStyles} />
+        style={{ position: 'relative', width, height }}>
+        <div style={{ position: 'relative', width }}>
+          <p className="bx--pie-graph-empty-text" />
+          <svg />
+          <div className="bx--pie-tooltip" style={tooltipStyles}>
+            <p className="bx--pie-value" style={valueStyles} />
+            <p className="bx--pie-key" style={keyStyles} />
+          </div>
+          <div id="tooltip-div" ref={id => (this.tooltipId = id)} />
         </div>
-        <div
-          className="bx--graph-tooltip"
-          id="tooltip-div"
-          ref={id => (this.tooltipId = id)}
-        />
       </div>
     );
   }

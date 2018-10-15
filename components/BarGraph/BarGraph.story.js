@@ -4,7 +4,7 @@ import BarGraph from './BarGraph';
 
 class UpdatingBarGraphContainer extends Component {
   state = {
-    data: this.createGroupedData(6).sort(function(a, b) {
+    data: createGroupedData(6).sort(function(a, b) {
       return a[a.length - 1] - b[b.length - 1];
     }),
   };
@@ -17,24 +17,8 @@ class UpdatingBarGraphContainer extends Component {
     }, 5000);
   }
 
-  createGroupedData(num) {
-    let data = [];
-    for (let i = 0; i < num; i++) {
-      let numArr = [];
-      const one = Math.floor(Math.random() * 1000 + 10);
-      const two = Math.floor(Math.random() * 1000 + 10);
-      const three = Math.floor(Math.random() * 1000 + 10);
-      const four = Math.floor(Math.random() * 1000 + 10);
-      numArr.push(one, two, three, four);
-      let d = i;
-      const entry = [numArr, d];
-      data.push(entry);
-    }
-    return data;
-  }
-
   updateData(i) {
-    let data = this.createGroupedData(6).sort(function(a, b) {
+    let data = createGroupedData(6).sort(function(a, b) {
       return a[a.length - 1] - b[b.length - 1];
     });
 

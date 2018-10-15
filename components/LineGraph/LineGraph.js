@@ -220,8 +220,8 @@ class LineGraph extends Component {
   updateEmptyState(data) {
     if (
       data[0]
-        ? (!Array.isArray(data[0][0]) && data.length < 2) ||
-          (Array.isArray(data[0][0]) && _.max(data.map(d => d.length)) < 2)
+        ? (!Array.isArray(data[0][0]) && !data.length) ||
+          (Array.isArray(data[0][0]) && _.max(data.map(d => d.length)) === 0)
         : true
     ) {
       this.svg.style('opacity', '.3');

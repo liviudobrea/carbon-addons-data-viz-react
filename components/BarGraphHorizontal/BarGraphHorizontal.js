@@ -102,18 +102,33 @@ class BarGraphHorizontal extends Component {
 
   componentWillUpdate(nextProps) {
     if (this.yScale) {
+      const dataLength = d3.max(nextProps.data, d => d[0].length);
       this.yScale.domain(nextProps.data.map(d => d[1]));
 
-      if (this.isGrouped) {
-        const dataLength = nextProps.data[0][0].length;
-        this.yScale1
-          .rangeRound([0, this.yScale.bandwidth()])
-          .domain(d3.range(dataLength));
-        this.xScale.domain([
-          0,
-          d3.max(nextProps.data, d => d3.max(d[0], i => i)),
-        ]);
+      if (dataLength > 1) {
+        if (!this.isGrouped) {
+          this.isGrouped = true;
+          this.yScale1 = d3
+            .scaleBand()
+            .rangeRound([0, this.yScale.bandwidth()])
+            .domain(d3.range(dataLength))
+            .padding(0.1);
+
+          this.xScale = d3
+            .scaleLinear()
+            .range([0, this.width])
+            .domain([0, d3.max(nextProps.data, d => d3.max(d[0], i => i))]);
+        } else {
+          this.yScale1
+            .rangeRound([0, this.yScale.bandwidth()])
+            .domain(d3.range(dataLength));
+          this.xScale.domain([
+            0,
+            d3.max(nextProps.data, d => d3.max(d[0], i => i)),
+          ]);
+        }
       } else {
+        this.isGrouped = false;
         this.xScale.domain([0, d3.max(nextProps.data, d => d[0][0])]);
       }
 
@@ -131,7 +146,7 @@ class BarGraphHorizontal extends Component {
 
     this.updateEmptyState(data);
 
-    const dataLength = data[0][0].length;
+    const dataLength = d3.max(data, d => d[0].length);
     this.isGrouped = dataLength > 1;
 
     this.yScale = d3
@@ -213,7 +228,7 @@ class BarGraphHorizontal extends Component {
 
     const barContainer = this.svg.append('g').attr('class', 'bar-container');
 
-    if (data.length > 1) {
+    if (data.length) {
       if (this.isGrouped) {
         this.count = 0;
         barContainer
@@ -456,7 +471,7 @@ class BarGraphHorizontal extends Component {
   }
 
   updateEmptyState(data) {
-    if (data.length < 2) {
+    if (!data.length) {
       this.svg.style('opacity', '.3');
       this.emptyContainer.style('display', 'inline-block');
     } else {

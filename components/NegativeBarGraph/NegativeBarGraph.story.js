@@ -4,7 +4,7 @@ import NegativeBarGraph from './NegativeBarGraph';
 
 class UpdatingNegativeBarGraphContainer extends Component {
   state = {
-    data: this.createGroupedData(4).sort(function(a, b) {
+    data: createGroupedData(4).sort(function(a, b) {
       return a[a.length - 1] - b[b.length - 1];
     }),
   };
@@ -23,24 +23,8 @@ class UpdatingNegativeBarGraphContainer extends Component {
     clearInterval(this.interval);
   }
 
-  createGroupedData(num) {
-    let data = [];
-    for (let i = 0; i < num; i++) {
-      let numArr = [];
-      const multiplier = i % 2 === 0 ? -1 : 1;
-      const one = Math.floor(Math.random() * 1000 * multiplier + 10);
-      const two = Math.floor(Math.random() * 1000 * multiplier + 10);
-      const three = Math.floor(Math.random() * 1000 * multiplier + 10);
-      const four = Math.floor(Math.random() * 1000 * multiplier + 10);
-      numArr.push(one, two, three, four);
-      const entry = [numArr, i];
-      data.push(entry);
-    }
-    return data;
-  }
-
   updateData(i) {
-    let data = this.createGroupedData(4).sort(function(a, b) {
+    let data = createGroupedData(4).sort(function(a, b) {
       return a[a.length - 1] - b[b.length - 1];
     });
 
@@ -90,8 +74,10 @@ function createData(num) {
   return data;
 }
 
+let times = 0;
 function createGroupedData(num) {
   let data = [];
+  times += 1;
   for (let i = 0; i < num; i++) {
     let numArr = [];
     const multiplier = i % 2 === 0 ? -1 : 1;
@@ -100,7 +86,15 @@ function createGroupedData(num) {
     const three = Math.floor(Math.random() * 1000 * multiplier + 10);
     const four = Math.floor(Math.random() * 1000 * multiplier + 10);
     const five = Math.floor(Math.random() * 1000 * multiplier + 10);
-    numArr.push(one, two, three, four, five);
+    if (times % 3 === 0) {
+      numArr.push(one, two, three, four, five);
+    } else {
+      if (i % 4 === 0) {
+        numArr.push(one, two, three, four, five);
+      } else {
+        numArr.push(one);
+      }
+    }
     let d = new Date();
     d = d.setDate(d.getDate() - i * 30);
     const entry = [numArr, d];
