@@ -55,6 +55,7 @@ class UpdatingBarGraphHorizontalContainer extends Component {
       id: this.props.id,
       containerId: this.props.containerId,
       drawLine: this.props.drawLine,
+      timeFormat: '%b',
     };
 
     return <BarGraphHorizontal data={data} {...props} />;
@@ -121,20 +122,9 @@ const props = {
   containerId: 'bar-graph-container',
 };
 
-let resizeInterval;
-
 storiesOf('BarGraphHorizontal', module)
-  .addDecorator(next => {
-    clearInterval(resizeInterval);
-    return next();
-  })
   .addWithInfo('Default', 'Horizontal Bar Graph', () => (
-    <BarGraphHorizontal
-      onHover={action('Hover')}
-      timeFormat="%b"
-      data={data}
-      {...props}
-    />
+    <BarGraphHorizontal timeFormat="%b" data={data} {...props} />
   ))
   .addWithInfo(
     'Resizing',
@@ -142,27 +132,44 @@ storiesOf('BarGraphHorizontal', module)
       Auto resizing Horizontal Bar Graph.
     `,
     () => {
-      let componentRef;
-      const Component = React.createElement(
-        BarGraphHorizontal,
-        {
-          ref: element => (componentRef = element),
-          onHover: action('Hover'),
-          timeFormat: '%b',
-          data,
-          ...props,
-        },
-        null
-      );
+      class ResizingGraph extends React.PureComponent {
+        state = {
+          height: Math.max(300, Math.min(Math.random() * 1000, 550)),
+          width: Math.max(650, Math.min(Math.random() * 1000, 900)),
+        };
 
-      resizeInterval = setInterval(() => {
-        if (componentRef && typeof componentRef.resize === 'function') {
-          const height = Math.max(300, Math.min(Math.random() * 1000, 550));
-          const width = Math.max(650, Math.min(Math.random() * 1000, 900));
-          componentRef.resize(height, width);
+        resizeInterval = null;
+
+        componentDidMount() {
+          this.resizeInterval = setInterval(() => {
+            this.setState({
+              height: Math.max(300, Math.min(Math.random() * 1000, 550)),
+              width: Math.max(650, Math.min(Math.random() * 1000, 900)),
+            });
+          }, 2500);
         }
-      }, 2500);
-      return Component;
+
+        componentWillUnmount() {
+          clearInterval(this.resizeInterval);
+          this.resizeInterval = null;
+        }
+
+        render() {
+          const { width, height } = this.state;
+          return (
+            <BarGraphHorizontal
+              timeFormat="%b"
+              data={data}
+              // xDomain={ _.max(groupedData.flatMap(d => d[0])) * 1.1 }
+              {...props}
+              width={width}
+              height={height}
+            />
+          );
+        }
+      }
+
+      return <ResizingGraph />;
     }
   )
   .addWithInfo(
@@ -170,14 +177,7 @@ storiesOf('BarGraphHorizontal', module)
     `
      Grouped Horizontal Bar Graph.
     `,
-    () => (
-      <BarGraphHorizontal
-        timeFormat="%b"
-        onHover={action('Hover')}
-        data={groupedData}
-        {...props}
-      />
-    )
+    () => <BarGraphHorizontal timeFormat="%b" data={groupedData} {...props} />
   )
   .addWithInfo(
     'Updating',
@@ -191,11 +191,5 @@ storiesOf('BarGraphHorizontal', module)
     `
      Empty Horizontal Bar Graph.
     `,
-    () => (
-      <BarGraphHorizontal
-        onHover={action('Hover')}
-        data={singleData}
-        {...props}
-      />
-    )
+    () => <BarGraphHorizontal data={singleData} {...props} />
   );
