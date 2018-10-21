@@ -179,6 +179,52 @@ storiesOf('NegativeBarGraph', module)
     )
   )
   .addWithInfo(
+    'Resizing',
+    `
+     Resizing Bar Graph.
+    `,
+    () => {
+      class ResizingGraph extends React.PureComponent {
+        state = {
+          height: Math.max(300, Math.min(Math.random() * 1000, 550)),
+          width: Math.max(650, Math.min(Math.random() * 1000, 900)),
+        };
+
+        resizeInterval = null;
+
+        componentDidMount() {
+          this.resizeInterval = setInterval(() => {
+            this.setState({
+              height: Math.max(300, Math.min(Math.random() * 1000, 550)),
+              width: Math.max(650, Math.min(Math.random() * 1000, 900)),
+            });
+          }, 2500);
+        }
+
+        componentWillUnmount() {
+          clearInterval(this.resizeInterval);
+          this.resizeInterval = null;
+        }
+
+        render() {
+          const { width, height } = this.state;
+          return (
+            <NegativeBarGraph
+              onHover={action('Hover')}
+              timeFormat="%b"
+              data={groupedData}
+              {...props}
+              width={width}
+              height={height}
+            />
+          );
+        }
+      }
+
+      return <ResizingGraph />;
+    }
+  )
+  .addWithInfo(
     'Updating',
     `
      Updating Grouped Bar Graph.
