@@ -24,6 +24,8 @@ const propTypes = {
   emptyText: PropTypes.string,
   color: PropTypes.array,
   showTooltip: PropTypes.bool,
+  formatValue: PropTypes.func,
+  formatTooltipData: PropTypes.func,
 };
 
 const defaultProps = {
@@ -41,12 +43,12 @@ const defaultProps = {
   labelOffsetX: 65,
   labelOffsetY: 55,
   axisOffset: 16,
-  timeFormat: null,
   xDomain: null,
+  timeFormat: null,
   xAxisLabel: 'X Axis',
   yAxisLabel: 'Y Axis',
   onHover: () => {},
-  formatValue: null,
+  formatValue: value => value,
   formatTooltipData: ({ data, seriesLabels, label, index, rect }) => {
     return [
       {
@@ -62,7 +64,7 @@ const defaultProps = {
   showTooltip: true,
 };
 
-class BarGraph extends Component {
+class BarGraphHorizontal extends Component {
   componentDidMount() {
     const { width, height, margin, containerId, emptyText } = this.props;
 
@@ -102,22 +104,22 @@ class BarGraph extends Component {
 
   componentWillUpdate(nextProps) {
     const { xDomain, data } = nextProps;
-    if (this.x) {
+    if (this.yScale) {
       const dataLength = d3.max(data, d => d[0].length);
-      this.x.domain(data.map(d => d[1]));
+      this.yScale.domain(data.map(d => d[1]));
 
-      if (dataLength) {
+      if (dataLength > 1) {
         if (!this.isGrouped) {
           this.isGrouped = true;
-          this.x1 = d3
+          this.yScale1 = d3
             .scaleBand()
-            .rangeRound([0, this.x.bandwidth()])
+            .rangeRound([0, this.yScale.bandwidth()])
             .domain(d3.range(dataLength))
-            .padding(0.05);
+            .padding(0.1);
 
-          this.y = d3
+          this.xScale = d3
             .scaleLinear()
-            .range([this.height, 0])
+            .range([0, this.width])
             .domain([
               0,
               xDomain !== null
@@ -125,10 +127,10 @@ class BarGraph extends Component {
                 : d3.max(data, d => d3.max(d[0], i => i)),
             ]);
         } else {
-          this.x1
-            .rangeRound([0, this.x.bandwidth()])
+          this.yScale1
+            .rangeRound([0, this.yScale.bandwidth()])
             .domain(d3.range(dataLength));
-          this.y.domain([
+          this.xScale.domain([
             0,
             xDomain !== null
               ? xDomain
@@ -137,13 +139,13 @@ class BarGraph extends Component {
         }
       } else {
         this.isGrouped = false;
-        this.y.domain([
+        this.xScale.domain([
           0,
           xDomain !== null ? xDomain : d3.max(data, d => d[0][0]),
         ]);
       }
 
-      this.updateEmptyState(nextProps.data);
+      this.updateEmptyState(data);
       this.updateData(nextProps);
     }
   }
@@ -153,74 +155,73 @@ class BarGraph extends Component {
   }
 
   initialRender() {
-    const { data, timeFormat, xDomain, formatValue } = this.props;
+    const { data, timeFormat, formatValue, xDomain } = this.props;
 
     this.updateEmptyState(data);
 
     const dataLength = d3.max(data, d => d[0].length);
     this.isGrouped = dataLength > 1;
 
-    this.x = d3
+    this.yScale = d3
       .scaleBand()
-      .rangeRound([0, this.width])
+      .rangeRound([0, this.height])
       .domain(data.map(d => d[1]))
       .padding(0.3);
 
     if (this.isGrouped) {
-      this.x1 = d3
+      this.yScale1 = d3
         .scaleBand()
-        .rangeRound([0, this.x.bandwidth()])
+        .rangeRound([0, this.yScale.bandwidth()])
         .domain(d3.range(dataLength))
-        .padding(0.05);
+        .padding(0.1);
 
-      this.y = d3
+      this.xScale = d3
         .scaleLinear()
-        .range([this.height, 0])
+        .range([0, this.width])
         .domain([
           0,
           xDomain !== null ? xDomain : d3.max(data, d => d3.max(d[0], i => i)),
         ]);
     } else {
-      this.y = d3
+      this.xScale = d3
         .scaleLinear()
-        .range([this.height, 0])
+        .range([0, this.width])
         .domain([0, xDomain !== null ? xDomain : d3.max(data, d => d[0][0])]);
     }
 
     this.xAxis = d3
       .axisBottom()
-      .scale(this.x)
-      .tickSize(0);
-
-    if (timeFormat !== null) {
-      this.xAxis.tickFormat(d3.timeFormat(timeFormat));
-    }
+      .ticks(4)
+      .tickSize(-this.height)
+      .scale(this.xScale.nice());
 
     this.yAxis = d3
       .axisLeft()
-      .ticks(4)
-      .tickSize(-this.width)
-      .scale(this.y.nice());
+      .scale(this.yScale)
+      .tickSize(0);
+
+    if (timeFormat !== null) {
+      this.yAxis.tickFormat(d3.timeFormat(timeFormat));
+    }
 
     if (formatValue !== null) {
-      this.yAxis.tickFormat(formatValue);
+      this.xAxis.tickFormat(formatValue);
     }
 
     this.renderAxes();
     this.renderLabels();
 
-    if (this.x) {
+    if (this.xScale) {
       this.renderBars();
     }
   }
 
   renderAxes() {
-    const { axisOffset } = this.props;
+    const { axisOffset, containerId, margin, width } = this.props;
 
     this.svg
       .append('g')
       .attr('class', 'bx--axis bx--axis--y')
-      .attr('stroke-dasharray', '4')
       .call(this.yAxis)
       .selectAll('text')
       .attr('x', -axisOffset);
@@ -230,9 +231,29 @@ class BarGraph extends Component {
       .attr('class', 'bx--axis bx--axis--x')
       .attr('transform', `translate(0, ${this.height})`)
       .call(this.xAxis)
+      .attr('stroke-dasharray', '4')
       .selectAll('text')
       .attr('y', axisOffset)
       .style('text-anchor', 'middle');
+
+    const yLabelsContainer = this.svg
+      .select('.bx--axis--y')
+      .node()
+      .getBoundingClientRect();
+
+    this.svg.attr(
+      'transform',
+      `translate(${
+        yLabelsContainer.width > margin.left
+          ? yLabelsContainer.width + axisOffset + 10
+          : margin.left
+      }, ${margin.top})`
+    );
+
+    d3.select(`#${containerId} svg`).attr(
+      'width',
+      width + yLabelsContainer.width
+    );
 
     this.updateStyles();
   }
@@ -250,7 +271,7 @@ class BarGraph extends Component {
           .data(data)
           .enter()
           .append('g')
-          .attr('transform', d => `translate(${this.x(d[1])}, 0)`)
+          .attr('transform', d => `translate(1, ${this.yScale(d[1])})`)
           .selectAll('rect')
           .data(d => {
             this.count++;
@@ -267,17 +288,16 @@ class BarGraph extends Component {
           .enter()
           .append('rect')
           .attr('class', 'bar')
-          .attr('x', d => this.x1(d.index))
-          .attr('y', this.height)
-          .attr('width', this.x1.bandwidth())
-          .attr('height', 0)
+          .attr('height', this.yScale1.bandwidth())
+          .attr('width', 0)
+          .attr('x', 0)
+          .attr('y', d => this.yScale1(d.index))
           .attr('fill', d => this.color(d.index))
           .attr('data-bar', d => `${d.index}-${d.group}`)
           .transition()
           .duration(500)
           .delay((d, i) => i * 50)
-          .attr('y', d => this.y(d.key))
-          .attr('height', d => this.height - this.y(d.key));
+          .attr('width', d => this.xScale(d.key));
       } else {
         barContainer
           .selectAll('rect')
@@ -285,17 +305,16 @@ class BarGraph extends Component {
           .enter()
           .append('rect')
           .attr('class', 'bar')
-          .attr('x', d => this.x(d[1]))
-          .attr('y', this.height)
-          .attr('height', 0)
-          .attr('width', this.x.bandwidth())
-          .attr('fill', (d, i) => this.color(i % this.props.color.length))
+          .attr('height', this.yScale.bandwidth())
+          .attr('width', 0)
+          .attr('x', 1)
+          .attr('y', d => this.yScale(d[1]))
           .attr('data-bar', (d, i) => `${i}-0`)
+          .attr('fill', (d, i) => this.color(i % this.props.color.length))
           .transition()
           .duration(500)
           .delay((d, i) => i * 50)
-          .attr('y', d => this.y(d[0]))
-          .attr('height', d => this.height - this.y(d[0]));
+          .attr('width', d => this.xScale(d[0]));
       }
 
       barContainer
@@ -308,6 +327,11 @@ class BarGraph extends Component {
   renderLabels() {
     const { labelOffsetY, labelOffsetX, xAxisLabel, yAxisLabel } = this.props;
 
+    const yLabelsContainer = this.svg
+      .select('.bx--axis--y')
+      .node()
+      .getBoundingClientRect();
+
     this.svg
       .select('.bx--axis--y')
       .append('text')
@@ -315,7 +339,14 @@ class BarGraph extends Component {
       .attr('class', 'bx--graph-label')
       .attr(
         'transform',
-        `translate(${-labelOffsetY}, ${this.height / 2}) rotate(-90)`
+        `translate(
+          ${
+            yLabelsContainer.width > labelOffsetY
+              ? -yLabelsContainer.width - 10
+              : -labelOffsetY
+          },
+          ${this.height / 2}
+        ) rotate(-90)`
       );
 
     this.svg
@@ -359,8 +390,8 @@ class BarGraph extends Component {
     const {
       timeFormat,
       showTooltip,
-      height,
       labelOffsetX,
+      margin,
       seriesLabels,
     } = this.props;
     const mouseData = this.getMouseData(d, i);
@@ -370,7 +401,7 @@ class BarGraph extends Component {
     );
     rect.attr('fill', d3.color(rect.attr('fill')).darker());
 
-    const xVal = mouseData.label;
+    const yVal = mouseData.label;
     if (timeFormat) {
       const format = d3.timeFormat(timeFormat);
 
@@ -392,23 +423,27 @@ class BarGraph extends Component {
         .select(this.tooltipId.children[0])
         .node()
         .getBoundingClientRect();
-      const offset = -tooltipSize.width / 2;
+      const offsetY = tooltipSize.height / 2.5;
+      const offsetX = tooltipSize.width / 2;
 
-      d3
-        .select(this.tooltipId)
+      const leftPos =
+        this.xScale(mouseData.data[0]) / 2 + labelOffsetX - offsetX;
+      const topPos =
+        -this.height -
+        margin.top -
+        margin.bottom -
+        offsetY +
+        this.yScale(yVal) +
+        (this.yScale1 ? this.yScale1(mouseData.index) : 0) -
+        (this.yScale1
+          ? this.yScale1.bandwidth() / 2
+          : this.yScale.bandwidth() / 2);
+
+      d3.select(this.tooltipId)
         .style('position', 'relative')
-        .style(
-          'left',
-          `${this.x(xVal) +
-            (this.x1 ? this.x1(mouseData.index) : 0) +
-            labelOffsetX +
-            offset +
-            (this.x1 ? this.x1.bandwidth() / 2 : this.x.bandwidth() / 2)}px`
-        )
-        .style(
-          'top',
-          `${this.y(mouseData.data[0]) - height - tooltipSize.height + 10}px`
-        );
+        .style('z-index', 1)
+        .style('left', `${leftPos}px`)
+        .style('top', `${topPos}px`);
     }
   }
 
@@ -433,21 +468,33 @@ class BarGraph extends Component {
   }
 
   resize(height, width) {
-    const { margin, containerId } = this.props;
+    const { margin, containerId, axisOffset } = this.props;
 
-    this.height = height - (margin.top + margin.bottom);
-    this.width = width - (margin.left + margin.right);
+    const yLabelsContainer = d3
+      .select(`#${containerId} svg .bx--axis--y`)
+      .node()
+      .getBoundingClientRect();
 
     this.svg.remove();
 
     this.svg = d3
       .select(`#${containerId} svg`)
       .attr('class', 'bx--graph')
-      .attr('width', width)
+      .attr('width', width + yLabelsContainer.width + 10)
       .attr('height', height)
       .append('g')
       .attr('class', 'bx--group-container')
-      .attr('transform', `translate(${margin.left}, ${margin.top})`);
+      .attr(
+        'transform',
+        `translate(${
+          yLabelsContainer.width > margin.left
+            ? yLabelsContainer.width + axisOffset
+            : margin.left
+        }, ${margin.top})`
+      );
+
+    this.height = height - (margin.top + margin.bottom);
+    this.width = width - (margin.left + margin.right);
 
     this.initialRender();
   }
@@ -490,7 +537,6 @@ class BarGraph extends Component {
   }
 
   updateStyles() {
-    this.svg.selectAll('.bx--axis--y path').style('display', 'none');
     this.svg.selectAll('.bx--axis path').attr('stroke', '#5A6872');
     this.svg.selectAll('.tick line').attr('stroke', '#5A6872');
     this.svg.selectAll('.tick text').attr('fill', '#5A6872');
@@ -499,17 +545,17 @@ class BarGraph extends Component {
   render() {
     const { id, containerId } = this.props;
 
-    if (this.x) {
+    if (this.xScale) {
       this.renderBars();
     }
 
     return (
       <div
-        className="bx--graph-container"
         id={containerId}
+        className="bx--graph-container"
         style={{ position: 'relative' }}>
         <p className="bx--bar-graph-empty-text" />
-        <svg id={id} />
+        <svg id={id} ref={id => (this.id = id)} />
         <div
           className="bx--graph-tooltip"
           id="tooltip-div"
@@ -520,7 +566,7 @@ class BarGraph extends Component {
   }
 }
 
-BarGraph.propTypes = propTypes;
-BarGraph.defaultProps = defaultProps;
+BarGraphHorizontal.propTypes = propTypes;
+BarGraphHorizontal.defaultProps = defaultProps;
 
-export default BarGraph;
+export default BarGraphHorizontal;
