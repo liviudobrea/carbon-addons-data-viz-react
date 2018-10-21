@@ -42,18 +42,7 @@ const defaultProps = {
 
 class PieChart extends Component {
   componentDidMount() {
-    const { id, emptyText, radius } = this.props;
-
-    const width = radius * 2;
-    const height = radius * 2 + 24;
-
-    this.svg = d3
-      .select(`#${id} svg`)
-      .attr('width', width)
-      .attr('height', height)
-      .append('g')
-      .attr('class', 'group-container')
-      .attr('transform', `translate(${width / 2}, ${height / 2})`);
+    const { id, emptyText } = this.props;
 
     this.emptyContainer = d3
       .select(`#${id} .bx--pie-graph-empty-text`)
@@ -79,11 +68,14 @@ class PieChart extends Component {
   }
 
   updateEmptyState(data) {
+    const { id } = this.props;
     if (!data.length) {
       this.svg.style('opacity', '.3');
+      d3.select(`#${id} .bx--pie-tooltip`).style('display', 'none');
       this.emptyContainer.style('display', 'inline-block');
     } else {
       this.svg.style('opacity', '1');
+      d3.select(`#${id} .bx--pie-tooltip`).style('display', 'inline-block');
       this.emptyContainer.style('display', 'none');
     }
   }
@@ -100,6 +92,24 @@ class PieChart extends Component {
       showTooltip,
     } = props;
 
+    if (this.svg) {
+      const paths = this.svg.selectAll('path');
+      if (paths.size()) {
+        this.svg.remove();
+      }
+    }
+
+    const width = radius * 2;
+    const height = radius * 2 + 24;
+
+    this.svg = d3
+      .select(`#${id} svg`)
+      .attr('width', width)
+      .attr('height', height)
+      .append('g')
+      .attr('class', 'group-container')
+      .attr('transform', `translate(${width / 2}, ${height / 2})`);
+
     this.updateEmptyState(props.data);
 
     const color = d3.scaleOrdinal(props.color);
@@ -110,19 +120,13 @@ class PieChart extends Component {
       .value(d => d[1]);
     const path = d3
       .arc()
-      .outerRadius(radius - 10)
-      .innerRadius(radius - 40);
+      .outerRadius(radius)
+      .innerRadius(radius - 30);
     const pathTwo = d3
       .arc()
       .outerRadius(radius)
-      .innerRadius(radius - 40);
-
-    if (this.svg) {
-      const paths = this.svg.selectAll('path');
-      if (paths.size()) {
-        this.svg.remove();
-      }
-    }
+      .innerRadius(radius - 30);
+    const pathRadius = path.innerRadius()();
 
     const arc = this.svg
       .selectAll('.arc')
@@ -177,28 +181,35 @@ class PieChart extends Component {
 
           ReactDOM.render(<DataTooltip data={tooltipData} />, tooltipId);
 
+          const pos = path.centroid(d);
+          let [leftPos, topPos] = pos;
+          let className = '';
+          const halfRadius = pathRadius / 2;
           const tooltipSize = d3
             .select(tooltipId.children[0])
             .node()
             .getBoundingClientRect();
-          const pos = path.centroid(d); //[x, y]
-          let leftPos = pos[0] + (tooltipSize.width * pos[0]) / 100;
-          let topPos = pos[1];
-          if (pos[1] < 0) {
-            topPos -= tooltipSize.height;
-          } else {
-            topPos += tooltipSize.height;
-          }
+          topPos += (topPos / radius) * tooltipSize.height;
+          leftPos += (leftPos / radius) * halfRadius;
+          leftPos += ((leftPos / Math.abs(leftPos)) * tooltipSize.width) / 2;
+          className += topPos > 0 ? 'bottom' : 'top';
+          className += leftPos > 0 ? 'right' : 'left';
+
           d3.select(tooltipId)
             .style('position', 'absolute')
-            .style('top', `50%`)
-            .style('left', `50%`)
+            .style('top', '50%')
+            .style('left', '50%')
             .style('transform', 'translate(-50%, -50%)')
-            .style('width', `${tooltipSize.width}px`)
-            .style('height', `${tooltipSize.height}px`)
-            .selectAll('.bx--tooltip')
-            .style('left', `calc(${leftPos}px)`)
-            .style('top', `${topPos}px`);
+            .style('width', '1px')
+            .style('height', '1px')
+            .attr('class', className)
+            .select('div')
+            .style('position', 'absolute')
+            .style('margin-left', (n, i, el) => `-${el[0].scrollWidth / 2}px`)
+            .style('margin-top', (n, i, el) => `-${el[0].scrollHeight / 2}px`)
+            .style('top', `${topPos}px`)
+            .style('left', `${leftPos}px`)
+            .style('width', 'auto');
         }
       })
       .on('mouseout', function() {
@@ -212,9 +223,7 @@ class PieChart extends Component {
         if (showTotals) {
           d3.select(`#${id} .bx--pie-tooltip`).style('display', 'block');
           d3.select(`#${id} .bx--pie-key`).text('Total');
-          d3.select(`#${id} .bx--pie-value`).text(
-            `${formatValue(totalAmount)}`
-          );
+          d3.select(`#${id} .bx--pie-value`).text(formatValue(totalAmount));
         }
 
         if (onHover) {
