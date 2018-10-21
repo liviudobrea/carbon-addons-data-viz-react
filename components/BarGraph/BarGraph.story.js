@@ -177,6 +177,52 @@ storiesOf('BarGraph', module)
     )
   )
   .addWithInfo(
+    'Resizing',
+    `
+      Auto resizing Horizontal Bar Graph.
+    `,
+    () => {
+      class ResizingGraph extends React.PureComponent {
+        state = {
+          height: Math.max(300, Math.min(Math.random() * 1000, 300)),
+          width: Math.max(650, Math.min(Math.random() * 1000, 800)),
+        };
+
+        resizeInterval = null;
+
+        componentDidMount() {
+          this.resizeInterval = setInterval(() => {
+            this.setState({
+              height: Math.max(200, Math.min(Math.random() * 1000, 300)),
+              width: Math.max(600, Math.min(Math.random() * 1000, 800)),
+            });
+          }, 2500);
+        }
+
+        componentWillUnmount() {
+          clearInterval(this.resizeInterval);
+          this.resizeInterval = null;
+        }
+
+        render() {
+          const { width, height } = this.state;
+          return (
+            <BarGraph
+              timeFormat="%b"
+              data={data}
+              // xDomain={ _.max(groupedData.flatMap(d => d[0])) * 1.1 }
+              {...props}
+              width={width}
+              height={height}
+            />
+          );
+        }
+      }
+
+      return <ResizingGraph />;
+    }
+  )
+  .addWithInfo(
     'Updating',
     `
      Updating Grouped Bar Graph.
