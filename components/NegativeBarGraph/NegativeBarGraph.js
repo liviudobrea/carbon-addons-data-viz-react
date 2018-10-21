@@ -99,19 +99,38 @@ class NegativeBarGraph extends Component {
 
   componentWillUpdate(nextProps) {
     if (this.yScale) {
+      const dataLength = d3.max(nextProps.data, d => d[0].length);
       this.yScale.domain(nextProps.data.map(d => d[1]));
 
-      if (this.isGrouped) {
-        const dataLength = nextProps.data[0][0].length;
-        this.yScale1
-          .rangeRound([this.yScale.bandwidth(), 0])
-          .domain(d3.range(dataLength));
-        this.xScale.domain(
-          d3.extent(
-            nextProps.data.reduce((acc, item) => acc.concat(item[0]), [])
-          )
-        );
+      if (dataLength > 1) {
+        if (!this.isGrouped) {
+          this.isGrouped = true;
+
+          this.yScale1 = d3
+            .scaleBand()
+            .rangeRound([this.yScale.bandwidth(), 0])
+            .domain(d3.range(dataLength))
+            .padding(0.1);
+          this.xScale = d3
+            .scaleLinear()
+            .range([0, this.width])
+            .domain(
+              d3.extent(
+                nextProps.data.reduce((acc, item) => acc.concat(item[0]), [])
+              )
+            );
+        } else {
+          this.yScale1
+            .rangeRound([this.yScale.bandwidth(), 0])
+            .domain(d3.range(dataLength));
+          this.xScale.domain(
+            d3.extent(
+              nextProps.data.reduce((acc, item) => acc.concat(item[0]), [])
+            )
+          );
+        }
       } else {
+        this.isGrouped = false;
         this.xScale.domain(d3.extent(nextProps.data.map(d => d[0][0])));
       }
 
@@ -131,8 +150,11 @@ class NegativeBarGraph extends Component {
 
     this.updateEmptyState(data);
 
-    const dataLength = data[0][0].length;
-    this.isGrouped = dataLength > 1;
+    let dataLength = 0;
+    if (data.length) {
+      dataLength = data[0][0].length;
+      this.isGrouped = dataLength > 1;
+    }
 
     this.yScale = d3
       .scaleBand()
@@ -224,7 +246,7 @@ class NegativeBarGraph extends Component {
 
     const barContainer = this.svg.append('g').attr('class', 'bar-container');
 
-    if (data.length > 1) {
+    if (data.length) {
       if (this.isGrouped) {
         this.count = 0;
         barContainer
@@ -512,7 +534,7 @@ class NegativeBarGraph extends Component {
   }
 
   updateEmptyState(data) {
-    if (data.length < 2) {
+    if (!data.length) {
       this.svg.style('opacity', '.3');
       this.emptyContainer.style('display', 'inline-block');
     } else {

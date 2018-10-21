@@ -181,6 +181,12 @@ class LineGraph extends Component {
   componentWillUpdate(nextProps) {
     if (this.x) {
       const { yDomain, isXTime, isUTC, datasets, data } = nextProps;
+      if (
+        _.isEqual(data, this.props.data) ||
+        _.isEqual(datasets, this.props.datasets)
+      )
+        return;
+
       const flatData = data.length > 0 ? data : _.flatten(datasets);
       const chartData = flatData.map(d => {
         return {
@@ -202,7 +208,7 @@ class LineGraph extends Component {
           yDomain[0] || d3.max(chartData, d => d.value),
         ]);
       }
-      this.updateEmptyState(data);
+      this.updateEmptyState(data.length > 0 ? data : datasets);
       this.updateData(nextProps);
     }
   }
@@ -220,8 +226,8 @@ class LineGraph extends Component {
   updateEmptyState(data) {
     if (
       data[0]
-        ? (!Array.isArray(data[0][0]) && data.length < 2) ||
-          (Array.isArray(data[0][0]) && _.max(data.map(d => d.length)) < 2)
+        ? (!Array.isArray(data[0][0]) && !data.length) ||
+          (Array.isArray(data[0][0]) && _.max(data.map(d => d.length)) === 0)
         : true
     ) {
       this.svg.style('opacity', '.3');
@@ -291,16 +297,9 @@ class LineGraph extends Component {
   resize(height, width) {
     const { margin, containerId, showLegend, seriesLabels } = this.props;
 
-    this.height = height - (margin.top + margin.bottom);
-    this.width =
-      width -
-      (margin.left +
-        margin.right +
-        (showLegend && seriesLabels.length > 0
-          ? 30 + _.max(seriesLabels.map(l => l.length)) * 8
-          : 0));
-
-    this.svg.remove();
+    if (this.svg) {
+      this.svg.remove();
+    }
 
     this.svg = d3
       .select(`#${containerId} svg`)
@@ -310,6 +309,15 @@ class LineGraph extends Component {
       .append('g')
       .attr('class', 'bx--group-container')
       .attr('transform', `translate(${margin.left}, ${margin.top})`);
+
+    this.width =
+      width -
+      (margin.left +
+        margin.right +
+        (showLegend && seriesLabels.length > 0
+          ? 30 + _.max(seriesLabels.map(l => l.length)) * 8
+          : 0));
+    this.height = height - (margin.top + margin.bottom);
 
     this.initialRender();
   }
