@@ -16,6 +16,7 @@ const propTypes = {
   labelOffsetY: PropTypes.number,
   axisOffset: PropTypes.number,
   timeFormat: PropTypes.string,
+  xDomain: PropTypes.number,
   xAxisLabel: PropTypes.string,
   yAxisLabel: PropTypes.string,
   onHover: PropTypes.func,
@@ -41,6 +42,7 @@ const defaultProps = {
   labelOffsetY: 55,
   axisOffset: 16,
   timeFormat: null,
+  xDomain: null,
   xAxisLabel: 'X Axis',
   yAxisLabel: 'Y Axis',
   onHover: () => {},
@@ -54,8 +56,8 @@ const defaultProps = {
       },
     ];
   },
-  emptyText:
-    'There is currently no data available for the parameters selected. Please try a different combination.',
+  emptyText: `There is currently no data available for the parameters selected.
+    Please try a different combination.`,
   color: ['#00A78F', '#3b1a40', '#473793', '#3c6df0', '#56D2BB'],
   showTooltip: true,
 };
@@ -91,19 +93,20 @@ class BarGraph extends Component {
 
   componentWillReceiveProps(nextProps) {
     if (
-      nextProps.height != this.props.height ||
-      nextProps.width != this.props.width
+      nextProps.height !== this.props.height ||
+      nextProps.width !== this.props.width
     ) {
       this.resize(nextProps.height, nextProps.width);
     }
   }
 
   componentWillUpdate(nextProps) {
+    const { xDomain, data } = nextProps;
     if (this.x) {
-      const dataLength = d3.max(nextProps.data, d => d[0].length);
-      this.x.domain(nextProps.data.map(d => d[1]));
+      const dataLength = d3.max(data, d => d[0].length);
+      this.x.domain(data.map(d => d[1]));
 
-      if (dataLength > 1) {
+      if (dataLength) {
         if (!this.isGrouped) {
           this.isGrouped = true;
           this.x1 = d3
@@ -115,16 +118,29 @@ class BarGraph extends Component {
           this.y = d3
             .scaleLinear()
             .range([this.height, 0])
-            .domain([0, d3.max(nextProps.data, d => d3.max(d[0], i => i))]);
+            .domain([
+              0,
+              xDomain !== null
+                ? xDomain
+                : d3.max(data, d => d3.max(d[0], i => i)),
+            ]);
         } else {
           this.x1
             .rangeRound([0, this.x.bandwidth()])
             .domain(d3.range(dataLength));
-          this.y.domain([0, d3.max(nextProps.data, d => d3.max(d[0], i => i))]);
+          this.y.domain([
+            0,
+            xDomain !== null
+              ? xDomain
+              : d3.max(data, d => d3.max(d[0], i => i)),
+          ]);
         }
       } else {
         this.isGrouped = false;
-        this.y.domain([0, d3.max(nextProps.data, d => d[0][0])]);
+        this.y.domain([
+          0,
+          xDomain !== null ? xDomain : d3.max(data, d => d[0][0]),
+        ]);
       }
 
       this.updateEmptyState(nextProps.data);
@@ -137,7 +153,7 @@ class BarGraph extends Component {
   }
 
   initialRender() {
-    const { data, timeFormat, formatValue } = this.props;
+    const { data, timeFormat, xDomain, formatValue } = this.props;
 
     this.updateEmptyState(data);
 
@@ -160,12 +176,15 @@ class BarGraph extends Component {
       this.y = d3
         .scaleLinear()
         .range([this.height, 0])
-        .domain([0, d3.max(data, d => d3.max(d[0], i => i))]);
+        .domain([
+          0,
+          xDomain !== null ? xDomain : d3.max(data, d => d3.max(d[0], i => i)),
+        ]);
     } else {
       this.y = d3
         .scaleLinear()
         .range([this.height, 0])
-        .domain([0, d3.max(data, d => d[0][0])]);
+        .domain([0, xDomain !== null ? xDomain : d3.max(data, d => d[0][0])]);
     }
 
     this.xAxis = d3

@@ -16,6 +16,7 @@ const propTypes = {
   labelOffsetY: PropTypes.number,
   axisOffset: PropTypes.number,
   timeFormat: PropTypes.string,
+  xDomain: PropTypes.number,
   xAxisLabel: PropTypes.string,
   yAxisLabel: PropTypes.string,
   onHover: PropTypes.func,
@@ -42,6 +43,7 @@ const defaultProps = {
   labelOffsetX: 65,
   labelOffsetY: 55,
   axisOffset: 16,
+  xDomain: null,
   timeFormat: null,
   xAxisLabel: 'X Axis',
   yAxisLabel: 'Y Axis',
@@ -56,8 +58,8 @@ const defaultProps = {
       },
     ];
   },
-  emptyText:
-    'There is currently no data available for the parameters selected. Please try a different combination.',
+  emptyText: `There is currently no data available for the parameters selected.
+    Please try a different combination.`,
   color: ['#00A78F', '#3b1a40', '#473793', '#3c6df0', '#56D2BB'],
   showTooltip: true,
 };
@@ -93,17 +95,18 @@ class BarGraphHorizontal extends Component {
 
   componentWillReceiveProps(nextProps) {
     if (
-      nextProps.height != this.props.height ||
-      nextProps.width != this.props.width
+      nextProps.height !== this.props.height ||
+      nextProps.width !== this.props.width
     ) {
       this.resize(nextProps.height, nextProps.width);
     }
   }
 
   componentWillUpdate(nextProps) {
+    const { xDomain, data } = nextProps;
     if (this.yScale) {
-      const dataLength = d3.max(nextProps.data, d => d[0].length);
-      this.yScale.domain(nextProps.data.map(d => d[1]));
+      const dataLength = d3.max(data, d => d[0].length);
+      this.yScale.domain(data.map(d => d[1]));
 
       if (dataLength > 1) {
         if (!this.isGrouped) {
@@ -117,22 +120,32 @@ class BarGraphHorizontal extends Component {
           this.xScale = d3
             .scaleLinear()
             .range([0, this.width])
-            .domain([0, d3.max(nextProps.data, d => d3.max(d[0], i => i))]);
+            .domain([
+              0,
+              xDomain !== null
+                ? xDomain
+                : d3.max(data, d => d3.max(d[0], i => i)),
+            ]);
         } else {
           this.yScale1
             .rangeRound([0, this.yScale.bandwidth()])
             .domain(d3.range(dataLength));
           this.xScale.domain([
             0,
-            d3.max(nextProps.data, d => d3.max(d[0], i => i)),
+            xDomain !== null
+              ? xDomain
+              : d3.max(data, d => d3.max(d[0], i => i)),
           ]);
         }
       } else {
         this.isGrouped = false;
-        this.xScale.domain([0, d3.max(nextProps.data, d => d[0][0])]);
+        this.xScale.domain([
+          0,
+          xDomain !== null ? xDomain : d3.max(data, d => d[0][0]),
+        ]);
       }
 
-      this.updateEmptyState(nextProps.data);
+      this.updateEmptyState(data);
       this.updateData(nextProps);
     }
   }
@@ -142,7 +155,7 @@ class BarGraphHorizontal extends Component {
   }
 
   initialRender() {
-    const { data, timeFormat, formatValue } = this.props;
+    const { data, timeFormat, formatValue, xDomain } = this.props;
 
     this.updateEmptyState(data);
 
@@ -165,12 +178,15 @@ class BarGraphHorizontal extends Component {
       this.xScale = d3
         .scaleLinear()
         .range([0, this.width])
-        .domain([0, d3.max(data, d => d3.max(d[0], i => i))]);
+        .domain([
+          0,
+          xDomain !== null ? xDomain : d3.max(data, d => d3.max(d[0], i => i)),
+        ]);
     } else {
       this.xScale = d3
         .scaleLinear()
         .range([0, this.width])
-        .domain([0, d3.max(data, d => d[0][0])]);
+        .domain([0, xDomain !== null ? xDomain : d3.max(data, d => d[0][0])]);
     }
 
     this.xAxis = d3
@@ -201,7 +217,7 @@ class BarGraphHorizontal extends Component {
   }
 
   renderAxes() {
-    const { axisOffset } = this.props;
+    const { axisOffset, containerId, margin, width } = this.props;
 
     this.svg
       .append('g')
@@ -220,6 +236,25 @@ class BarGraphHorizontal extends Component {
       .attr('y', axisOffset)
       .style('text-anchor', 'middle');
 
+    const yLabelsContainer = this.svg
+      .select('.bx--axis--y')
+      .node()
+      .getBoundingClientRect();
+
+    this.svg.attr(
+      'transform',
+      `translate(${
+        yLabelsContainer.width > margin.left
+          ? yLabelsContainer.width + axisOffset + 10
+          : margin.left
+      }, ${margin.top})`
+    );
+
+    d3.select(`#${containerId} svg`).attr(
+      'width',
+      width + yLabelsContainer.width
+    );
+
     this.updateStyles();
   }
 
@@ -236,7 +271,7 @@ class BarGraphHorizontal extends Component {
           .data(data)
           .enter()
           .append('g')
-          .attr('transform', d => `translate(0, ${this.yScale(d[1])})`)
+          .attr('transform', d => `translate(1, ${this.yScale(d[1])})`)
           .selectAll('rect')
           .data(d => {
             this.count++;
@@ -272,12 +307,10 @@ class BarGraphHorizontal extends Component {
           .attr('class', 'bar')
           .attr('height', this.yScale.bandwidth())
           .attr('width', 0)
-          .attr('x', 0)
+          .attr('x', 1)
           .attr('y', d => this.yScale(d[1]))
           .attr('data-bar', (d, i) => `${i}-0`)
-          .attr('fill', (d, i) => {
-            return this.color(i % this.props.color.length);
-          })
+          .attr('fill', (d, i) => this.color(i % this.props.color.length))
           .transition()
           .duration(500)
           .delay((d, i) => i * 50)
@@ -294,6 +327,11 @@ class BarGraphHorizontal extends Component {
   renderLabels() {
     const { labelOffsetY, labelOffsetX, xAxisLabel, yAxisLabel } = this.props;
 
+    const yLabelsContainer = this.svg
+      .select('.bx--axis--y')
+      .node()
+      .getBoundingClientRect();
+
     this.svg
       .select('.bx--axis--y')
       .append('text')
@@ -301,7 +339,14 @@ class BarGraphHorizontal extends Component {
       .attr('class', 'bx--graph-label')
       .attr(
         'transform',
-        `translate(${-labelOffsetY}, ${this.height / 2}) rotate(-90)`
+        `translate(
+          ${
+            yLabelsContainer.width > labelOffsetY
+              ? -yLabelsContainer.width - 10
+              : -labelOffsetY
+          },
+          ${this.height / 2}
+        ) rotate(-90)`
       );
 
     this.svg
@@ -424,21 +469,33 @@ class BarGraphHorizontal extends Component {
   }
 
   resize(height, width) {
-    const { margin, containerId } = this.props;
+    const { margin, containerId, axisOffset } = this.props;
 
-    this.height = height - (margin.top + margin.bottom);
-    this.width = width - (margin.left + margin.right);
+    const yLabelsContainer = d3
+      .select(`#${containerId} svg .bx--axis--y`)
+      .node()
+      .getBoundingClientRect();
 
     this.svg.remove();
 
     this.svg = d3
       .select(`#${containerId} svg`)
       .attr('class', 'bx--graph')
-      .attr('width', width)
+      .attr('width', width + yLabelsContainer.width + 10)
       .attr('height', height)
       .append('g')
       .attr('class', 'bx--group-container')
-      .attr('transform', `translate(${margin.left}, ${margin.top})`);
+      .attr(
+        'transform',
+        `translate(${
+          yLabelsContainer.width > margin.left
+            ? yLabelsContainer.width + axisOffset
+            : margin.left
+        }, ${margin.top})`
+      );
+
+    this.height = height - (margin.top + margin.bottom);
+    this.width = width - (margin.left + margin.right);
 
     this.initialRender();
   }
@@ -481,7 +538,6 @@ class BarGraphHorizontal extends Component {
   }
 
   updateStyles() {
-    this.svg.selectAll('.bx--axis--x path').style('display', 'none');
     this.svg.selectAll('.bx--axis path').attr('stroke', '#5A6872');
     this.svg.selectAll('.tick line').attr('stroke', '#5A6872');
     this.svg.selectAll('.tick text').attr('fill', '#5A6872');
