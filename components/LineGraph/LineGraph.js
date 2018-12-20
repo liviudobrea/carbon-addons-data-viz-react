@@ -398,6 +398,7 @@ class LineGraph extends Component {
     this.xAxis = d3
       .axisBottom()
       .scale(this.x.nice())
+      .ticks(data.length > 0 ? data.length : datasets.length)
       .tickSize(0)
       .tickFormat(isXTime ? tickFormat : null);
 
