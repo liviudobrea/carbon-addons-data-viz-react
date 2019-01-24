@@ -54,7 +54,7 @@ class PieChart extends Component {
       .style('width', '100%')
       .style('transform', 'translate(-50%, -50%)');
 
-    this.renderSVG(this.props);
+    this.renderSVG();
   }
 
   shouldComponentUpdate(nextProps) {
@@ -63,6 +63,7 @@ class PieChart extends Component {
 
   updateEmptyState(data) {
     const { id } = this.props;
+    if (!this.emptyContainer) return;
     if (!data.length) {
       this.svg.style('opacity', '.3');
       d3.select(`#${id} .bx--pie-tooltip`).style('display', 'none');
@@ -74,9 +75,28 @@ class PieChart extends Component {
     }
   }
 
-  renderSVG(props) {
+  getOffset(el) {
+    if (!el) return { top: 0, left: 0, right: 0, width: 0 };
+    const rect = el.getBoundingClientRect();
+    const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
+    const scrollLeft =
+      window.pageXOffset || document.documentElement.scrollLeft;
+    return {
+      top: rect.top + scrollTop,
+      left: rect.left + scrollLeft,
+      right:
+        document.documentElement.clientWidth -
+        rect.width -
+        (rect.left + scrollLeft),
+      width: rect.width,
+      height: rect.height,
+    };
+  }
+
+  renderSVG() {
     const {
       data,
+      color,
       radius,
       formatValue,
       formatTooltipData,
@@ -84,7 +104,7 @@ class PieChart extends Component {
       onHover,
       showTotals,
       showTooltip,
-    } = props;
+    } = this.props;
 
     if (this.svg) {
       const paths = this.svg.selectAll('path');
@@ -98,15 +118,14 @@ class PieChart extends Component {
 
     this.svg = d3
       .select(`#${id} svg`)
-      .attr('width', width)
+      .attr('width', width + 20)
       .attr('height', height)
       .append('g')
       .attr('class', 'group-container')
-      .attr('transform', `translate(${width / 2}, ${height / 2})`);
+      .attr('transform', `translate(${width / 2 + 10}, ${height / 2})`);
 
-    this.updateEmptyState(props.data);
+    this.updateEmptyState(data);
 
-    const color = d3.scaleOrdinal(props.color);
     const tooltipId = this.tooltipId;
     const pie = d3
       .pie()
@@ -116,9 +135,9 @@ class PieChart extends Component {
       .arc()
       .outerRadius(radius)
       .innerRadius(radius - 30);
-    const pathTwo = d3
+    const arcOver = d3
       .arc()
-      .outerRadius(radius)
+      .outerRadius(radius + 10)
       .innerRadius(radius - 30);
     const pathRadius = path.innerRadius()();
 
@@ -129,9 +148,11 @@ class PieChart extends Component {
       .append('g')
       .attr('class', 'arc');
 
+    const scaledColor = d3.scaleOrdinal(color);
+
     arc
       .append('path')
-      .attr('fill', (d, i) => color(i))
+      .attr('fill', (d, i) => scaledColor(i))
       .attr('stroke-width', 2)
       .attr('stroke', '#FFFFFF')
       .transition()
@@ -153,13 +174,17 @@ class PieChart extends Component {
       d3.select(`#${id} .bx--pie-value`).text(`${formatValue(totalAmount)}`);
     }
 
+    const _this = this;
+
     this.svg
       .selectAll('path')
       .on('mouseover', function(d) {
         d3.select(this)
           .transition()
-          .style('cursor', 'pointer')
-          .attr('d', pathTwo);
+          .duration(500)
+          .ease(d3.easeElastic)
+          .attr('d', arcOver)
+          .style('cursor', 'pointer');
 
         d3.select(`#${id} .bx--pie-tooltip`).style('display', 'inherit');
         d3.select(`#${id} .bx--pie-key`).text(`${d.data[0]}`);
@@ -170,7 +195,7 @@ class PieChart extends Component {
         if (showTooltip) {
           const tooltipData = formatTooltipData({
             data: d.data,
-            color: color(d.index),
+            color: scaledColor(d.index),
           });
 
           ReactDOM.render(<DataTooltip data={tooltipData} />, tooltipId);
@@ -188,6 +213,27 @@ class PieChart extends Component {
           leftPos += ((leftPos / Math.abs(leftPos)) * tooltipSize.width) / 2;
           className += topPos > 0 ? 'bottom' : 'top';
           className += leftPos > 0 ? 'right' : 'left';
+          const svgOffset = _this.getOffset(_this.svg.node());
+
+          if (className.includes('right')) {
+            const position =
+              svgOffset.right +
+              svgOffset.width / 2 -
+              Math.abs(tooltipSize.width / 2) -
+              Math.abs(leftPos);
+            if (position < 0) {
+              leftPos = leftPos - Math.abs(position);
+            }
+          } else if (className.includes('left')) {
+            const position =
+              svgOffset.left +
+              svgOffset.width / 2 -
+              Math.abs(tooltipSize.width / 2) -
+              Math.abs(leftPos);
+            if (position < 0) {
+              leftPos = leftPos + Math.abs(position);
+            }
+          }
 
           d3.select(tooltipId)
             .style('position', 'absolute')
@@ -206,7 +252,25 @@ class PieChart extends Component {
             .style('width', 'auto');
         }
       })
-      .on('mouseout', function() {
+      .on('mouseout', function mouseout() {
+        const tooltipChild = _this.tooltipId.children[0];
+        const handleMouseOut = mouseout.bind(this);
+        if (showTooltip) {
+          if (tooltipChild) {
+            tooltipChild.removeEventListener('mouseout', handleMouseOut);
+          }
+          const { clientX, clientY } = event;
+          const tooltipOffset = _this.getOffset(tooltipChild);
+          if (
+            clientX >= tooltipOffset.left &&
+            clientX <= tooltipOffset.left + tooltipOffset.width &&
+            clientY >= tooltipOffset.top &&
+            clientY <= tooltipOffset.top + tooltipOffset.height
+          ) {
+            tooltipChild.addEventListener('mouseout', handleMouseOut);
+            return;
+          }
+        }
         d3.select(`#${id} .bx--pie-tooltip`).style(
           'display',
           !showTotals && 'none'
@@ -234,7 +298,7 @@ class PieChart extends Component {
       position: 'absolute',
       top: '50%',
       left: '50%',
-      transform: 'translate(-50%, -50%)',
+      transform: 'translate(calc(-50% + 10px), -50%)',
     };
 
     const keyStyles = {
@@ -253,6 +317,8 @@ class PieChart extends Component {
 
     const width = radius * 2;
     const height = radius * 2 + 24;
+
+    this.renderSVG();
 
     return (
       <div
