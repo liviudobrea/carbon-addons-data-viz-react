@@ -24,6 +24,7 @@ const propTypes = {
   emptyText: PropTypes.string,
   color: PropTypes.array,
   showTooltip: PropTypes.bool,
+  enableLabelWrapping: PropTypes.bool,
 };
 
 const defaultProps = {
@@ -43,6 +44,7 @@ const defaultProps = {
   axisOffset: 16,
   timeFormat: null,
   xDomain: null,
+  enableLabelWrapping: false,
   xAxisLabel: 'X Axis',
   yAxisLabel: 'Y Axis',
   onHover: () => {},
@@ -214,6 +216,70 @@ class BarGraph extends Component {
     }
   }
 
+  wrapText(el) {
+    const {
+      width,
+      data,
+      labelOffsetX,
+      timeFormat,
+      enableLabelWrapping,
+    } = this.props;
+    if (!enableLabelWrapping) return el;
+    const itemSpace = width / data.length;
+
+    const wrapText = function() {
+      const self = d3.select(this);
+      let textLength = self.node().getComputedTextLength();
+      let text = self.text();
+      let padding = 8;
+      while (
+        textLength > itemSpace - 2 * Math.min(padding, 20) &&
+        text.length > 0
+      ) {
+        text = text.slice(0, -1);
+        self.text(text + '...');
+        textLength = self.node().getComputedTextLength();
+        if (itemSpace - textLength < 0) {
+          padding += 1;
+        }
+      }
+    };
+
+    d3.select(el)
+      .on('mouseover', (d, i) => {
+        ReactDOM.render(
+          <DataTooltip
+            className="legend-text"
+            data={[
+              {
+                data: timeFormat !== null ? d3.timeFormat(timeFormat)(d) : d,
+              },
+            ]}
+            direction="bottom"
+          />,
+          this.tooltipId
+        );
+        const tooltipSize = d3
+          .select(this.tooltipId.children[0])
+          .node()
+          .getBoundingClientRect();
+        d3.select(this.tooltipId)
+          .style('position', 'relative')
+          .style(
+            'left',
+            `${this.x(d) +
+              (this.x1 ? this.x1(i) : 0) +
+              labelOffsetX -
+              tooltipSize.width / 2 +
+              (this.x1 ? this.x1.bandwidth() / 2 : this.x.bandwidth() / 2)}px`
+          )
+          .style('top', '-40px');
+      })
+      .on('mouseout', () => ReactDOM.unmountComponentAtNode(this.tooltipId));
+
+    return wrapText.call(el);
+  }
+
   renderAxes() {
     const { axisOffset } = this.props;
 
@@ -224,13 +290,16 @@ class BarGraph extends Component {
       .call(this.yAxis)
       .selectAll('text')
       .attr('x', -axisOffset);
-
+    const _this = this;
     this.svg
       .append('g')
       .attr('class', 'bx--axis bx--axis--x')
       .attr('transform', `translate(0, ${this.height})`)
       .call(this.xAxis)
       .selectAll('text')
+      .each(function() {
+        return _this.wrapText.call(_this, this);
+      })
       .attr('y', axisOffset)
       .style('text-anchor', 'middle');
 
@@ -394,8 +463,7 @@ class BarGraph extends Component {
         .getBoundingClientRect();
       const offset = -tooltipSize.width / 2;
 
-      d3
-        .select(this.tooltipId)
+      d3.select(this.tooltipId)
         .style('position', 'relative')
         .style(
           'left',
@@ -454,7 +522,7 @@ class BarGraph extends Component {
 
   updateData(nextProps) {
     const { axisOffset, xAxisLabel, yAxisLabel } = nextProps;
-
+    const _this = this;
     this.svg.selectAll('g.bar-container').remove();
 
     this.svg
@@ -471,6 +539,9 @@ class BarGraph extends Component {
       .transition()
       .call(this.xAxis)
       .selectAll('.bx--axis--x .tick text')
+      .each(function() {
+        return _this.wrapText.call(_this, this);
+      })
       .attr('y', axisOffset)
       .style('text-anchor', 'middle');
 
