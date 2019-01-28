@@ -220,13 +220,12 @@ class BarGraph extends Component {
     const {
       width,
       data,
-      labelOffsetX,
       timeFormat,
       enableLabelWrapping,
+      margin,
     } = this.props;
     if (!enableLabelWrapping) return el;
     const itemSpace = width / data.length;
-
     const wrapText = function() {
       const self = d3.select(this);
       let textLength = self.node().getComputedTextLength();
@@ -244,9 +243,11 @@ class BarGraph extends Component {
         }
       }
     };
-
+    const transformMatrix = new WebKitCSSMatrix(
+      getComputedStyle(el.parentElement).webkitTransform
+    );
     d3.select(el)
-      .on('mouseover', (d, i) => {
+      .on('mouseover', d => {
         ReactDOM.render(
           <DataTooltip
             className="legend-text"
@@ -259,23 +260,23 @@ class BarGraph extends Component {
           />,
           this.tooltipId
         );
-        const tooltipSize = d3
-          .select(this.tooltipId.children[0])
-          .node()
-          .getBoundingClientRect();
+        const tooltipWidth = (this.tooltipId && this.tooltipId.children)
+          ? this.children[0].clientWidth
+          : 100;
         d3.select(this.tooltipId)
-          .style('position', 'relative')
+          .style('position', 'absolute')
           .style(
-            'left',
-            `${this.x(d) +
-              (this.x1 ? this.x1(i) : 0) +
-              labelOffsetX -
-              tooltipSize.width / 2 +
-              (this.x1 ? this.x1.bandwidth() / 2 : this.x.bandwidth() / 2)}px`
+            'transform',
+            `translate(
+              ${Math.abs(margin.left + transformMatrix.m41 - tooltipWidth / 2)}px,
+              0
+            )`
           )
-          .style('top', '-40px');
       })
-      .on('mouseout', () => ReactDOM.unmountComponentAtNode(this.tooltipId));
+      .on('mouseout', () => {
+        d3.select(this.tooltipId).attr('style', '');
+        ReactDOM.unmountComponentAtNode(this.tooltipId)
+      });
 
     return wrapText.call(el);
   }
@@ -497,6 +498,7 @@ class BarGraph extends Component {
             ? this.color(mouseData.index)
             : this.color(mouseData.index % this.props.color.length)
       );
+    d3.select(this.tooltipId).attr('style', '');
     ReactDOM.unmountComponentAtNode(this.tooltipId);
   }
 
