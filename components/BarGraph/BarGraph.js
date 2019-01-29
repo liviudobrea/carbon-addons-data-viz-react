@@ -65,6 +65,15 @@ const defaultProps = {
 };
 
 class BarGraph extends Component {
+  constructor(props) {
+    super(props);
+    const { width, height, margin } = this.props;
+
+    this.width = width - (margin.left + margin.right);
+    this.height = height - (margin.top + margin.bottom);
+    this.color = d3.scaleOrdinal(this.props.color);
+  }
+
   componentDidMount() {
     const { width, height, margin, containerId, emptyText } = this.props;
 
@@ -85,73 +94,19 @@ class BarGraph extends Component {
       .append('g')
       .attr('class', 'bx--group-container')
       .attr('transform', `translate(${margin.left}, ${margin.top})`);
-
-    this.width = width - (margin.left + margin.right);
-    this.height = height - (margin.top + margin.bottom);
-    this.color = d3.scaleOrdinal(this.props.color);
-
     this.initialRender();
-  }
-
-  componentWillReceiveProps(nextProps) {
-    if (
-      nextProps.height !== this.props.height ||
-      nextProps.width !== this.props.width
-    ) {
-      this.resize(nextProps.height, nextProps.width);
-    }
-  }
-
-  componentWillUpdate(nextProps) {
-    const { xDomain, data } = nextProps;
-    if (this.x) {
-      const dataLength = d3.max(data, d => d[0].length);
-      this.x.domain(data.map(d => d[1]));
-
-      if (dataLength) {
-        if (!this.isGrouped) {
-          this.isGrouped = true;
-          this.x1 = d3
-            .scaleBand()
-            .rangeRound([0, this.x.bandwidth()])
-            .domain(d3.range(dataLength))
-            .padding(0.05);
-
-          this.y = d3
-            .scaleLinear()
-            .range([this.height, 0])
-            .domain([
-              0,
-              xDomain !== null
-                ? xDomain
-                : d3.max(data, d => d3.max(d[0], i => i)),
-            ]);
-        } else {
-          this.x1
-            .rangeRound([0, this.x.bandwidth()])
-            .domain(d3.range(dataLength));
-          this.y.domain([
-            0,
-            xDomain !== null
-              ? xDomain
-              : d3.max(data, d => d3.max(d[0], i => i)),
-          ]);
-        }
-      } else {
-        this.isGrouped = false;
-        this.y.domain([
-          0,
-          xDomain !== null ? xDomain : d3.max(data, d => d[0][0]),
-        ]);
-      }
-
-      this.updateEmptyState(nextProps.data);
-      this.updateData(nextProps);
-    }
   }
 
   shouldComponentUpdate(nextProps) {
     return !_.isEqual(this.props, nextProps);
+  }
+
+  componentDidUpdate(nextProps) {
+    const { margin, height, width } = nextProps;
+    this.height = height - (margin.top + margin.bottom);
+    this.width = width - (margin.left + margin.right);
+    this.svg.selectAll('.bx--group-container > g').remove();
+    this.initialRender();
   }
 
   initialRender() {
@@ -217,15 +172,12 @@ class BarGraph extends Component {
   }
 
   wrapText(el) {
-    const {
-      width,
-      data,
-      timeFormat,
-      enableLabelWrapping,
-      margin,
-    } = this.props;
+    const { data, timeFormat, enableLabelWrapping, margin } = this.props;
     if (!enableLabelWrapping) return el;
-    const itemSpace = width / data.length;
+    const itemSpace = this.width / data.length;
+    const transformMatrix = new WebKitCSSMatrix(
+      getComputedStyle(el.parentElement).webkitTransform
+    );
     const wrapText = function() {
       const self = d3.select(this);
       let textLength = self.node().getComputedTextLength();
@@ -243,9 +195,7 @@ class BarGraph extends Component {
         }
       }
     };
-    const transformMatrix = new WebKitCSSMatrix(
-      getComputedStyle(el.parentElement).webkitTransform
-    );
+
     d3.select(el)
       .on('mouseover', d => {
         ReactDOM.render(
@@ -283,6 +233,7 @@ class BarGraph extends Component {
 
   renderAxes() {
     const { axisOffset } = this.props;
+    const _this = this;
 
     this.svg
       .append('g')
@@ -291,13 +242,12 @@ class BarGraph extends Component {
       .call(this.yAxis)
       .selectAll('text')
       .attr('x', -axisOffset);
-    const _this = this;
     this.svg
       .append('g')
       .attr('class', 'bx--axis bx--axis--x')
       .attr('transform', `translate(0, ${this.height})`)
       .call(this.xAxis)
-      .selectAll('text')
+      .selectAll('.tick text')
       .each(function() {
         return _this.wrapText.call(_this, this);
       })
@@ -502,56 +452,6 @@ class BarGraph extends Component {
     ReactDOM.unmountComponentAtNode(this.tooltipId);
   }
 
-  resize(height, width) {
-    const { margin, containerId } = this.props;
-
-    this.height = height - (margin.top + margin.bottom);
-    this.width = width - (margin.left + margin.right);
-
-    this.svg.remove();
-
-    this.svg = d3
-      .select(`#${containerId} svg`)
-      .attr('class', 'bx--graph')
-      .attr('width', width)
-      .attr('height', height)
-      .append('g')
-      .attr('class', 'bx--group-container')
-      .attr('transform', `translate(${margin.left}, ${margin.top})`);
-
-    this.initialRender();
-  }
-
-  updateData(nextProps) {
-    const { axisOffset, xAxisLabel, yAxisLabel } = nextProps;
-    const _this = this;
-    this.svg.selectAll('g.bar-container').remove();
-
-    this.svg
-      .select('.bx--axis--y')
-      .transition()
-      .call(this.yAxis)
-      .selectAll('text')
-      .attr('x', -axisOffset);
-
-    this.svg.select('.bx--axis--y .bx--graph-label').text(yAxisLabel);
-
-    this.svg
-      .select('.bx--axis--x')
-      .transition()
-      .call(this.xAxis)
-      .selectAll('.bx--axis--x .tick text')
-      .each(function() {
-        return _this.wrapText.call(_this, this);
-      })
-      .attr('y', axisOffset)
-      .style('text-anchor', 'middle');
-
-    this.svg.select('.bx--axis--x .bx--graph-label').text(xAxisLabel);
-
-    this.updateStyles();
-  }
-
   updateEmptyState(data) {
     if (!data.length) {
       this.svg.style('opacity', '.3');
@@ -571,10 +471,6 @@ class BarGraph extends Component {
 
   render() {
     const { id, containerId } = this.props;
-
-    if (this.x) {
-      this.renderBars();
-    }
 
     return (
       <div
