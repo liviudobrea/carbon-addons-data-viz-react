@@ -214,7 +214,7 @@ class BarGraph extends Component {
           ? this.tooltipId.children[0].clientWidth
           : 100;
         d3.select(this.tooltipId)
-          .style('position', 'absolute')
+          .style('position', 'relative')
           .style(
             'transform',
             `translate(
