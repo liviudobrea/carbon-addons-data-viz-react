@@ -124,8 +124,6 @@ class PieChart extends Component {
       .attr('class', 'group-container')
       .attr('transform', `translate(${width / 2 + 10}, ${height / 2})`);
 
-    this.updateEmptyState(data);
-
     const tooltipId = this.tooltipId;
     const pie = d3
       .pie()
@@ -173,6 +171,8 @@ class PieChart extends Component {
       d3.select(`#${id} .bx--pie-key`).text('Total');
       d3.select(`#${id} .bx--pie-value`).text(`${formatValue(totalAmount)}`);
     }
+
+    this.updateEmptyState(data);
 
     const _this = this;
 
