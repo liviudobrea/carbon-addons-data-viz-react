@@ -258,7 +258,7 @@ class PieChart extends Component {
           if (tooltipChild) {
             tooltipChild.removeEventListener('mouseout', handleMouseOut);
           }
-          const { clientX, clientY } = event;
+          const { clientX, clientY } = d3.event || event;
           const tooltipOffset = _this.getOffset(tooltipChild);
           if (
             clientX >= tooltipOffset.left &&
