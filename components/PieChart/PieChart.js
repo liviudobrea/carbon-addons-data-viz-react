@@ -173,7 +173,6 @@ class PieChart extends Component {
     }
 
     this.updateEmptyState(data);
-
     const _this = this;
 
     this.svg

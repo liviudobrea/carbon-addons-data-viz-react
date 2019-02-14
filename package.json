@@ -150,8 +150,5 @@
       "prettier",
       "git add"
     ]
-  },
-  "publishConfig":{
-    "registry":"https://na.artifactory.swg-devops.com/artifactory/api/npm/res-ozya-itm-npm-local/"
   }
 }
