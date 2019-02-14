@@ -533,19 +533,16 @@ class LineGraph extends Component {
         .attr('height', this.height);
     }
 
-    const overlayEl = this.svg
+    this.svg
       .append('rect')
       .attr('width', this.width)
       .attr('height', this.height)
       .attr('class', 'overlay')
       .style('fill', 'none')
       .style('pointer-events', 'all')
-      .on('mousemove', () => {
-        this.onMouseMove();
-      })
-      .on('mouseout', () => {
-        this.onMouseOut(overlayEl.node());
-      });
+      .on('mouseover', this.onMouseMove.bind(this))
+      .on('mousemove', this.onMouseMove.bind(this))
+      .on('mouseout', this.onMouseOut.bind(this));
   }
 
   renderLegend() {
@@ -588,18 +585,47 @@ class LineGraph extends Component {
       .text((d, i) => seriesLabels[i]);
   }
 
-  onMouseOut(overlayNode) {
-    const { hoverOverlay, data, datasets } = this.props;
-    const overlayNodeBBox = overlayNode.getBBox();
-    const overlayPos = d3.mouse(overlayNode);
+  getOffset(el) {
+    if (!el) return { top: 0, left: 0, right: 0, width: 0 };
+    const rect = el.getBoundingClientRect();
+    const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
+    const scrollLeft =
+      window.pageXOffset || document.documentElement.scrollLeft;
+    return {
+      top: rect.top + scrollTop,
+      left: rect.left + scrollLeft,
+      right:
+        document.documentElement.clientWidth -
+        rect.width -
+        (rect.left + scrollLeft),
+      width: rect.width,
+      height: rect.height,
+    };
+  }
 
-    if (
-      overlayPos.every(v => v > 0) &&
-      (overlayPos[0] < overlayNodeBBox.width &&
-        overlayPos[1] < overlayNodeBBox.height)
-    ) {
-      return;
+  onMouseOut() {
+    const { hoverOverlay, data, datasets, showTooltip } = this.props;
+    const tooltipChild = this.tooltipId.children[0];
+    if (showTooltip) {
+      if (tooltipChild) {
+        tooltipChild.removeEventListener(
+          'mouseout',
+          this.onMouseOut.bind(this)
+        );
+      }
+      const { clientX, clientY } = d3.event || event;
+      const tooltipOffset = this.getOffset(tooltipChild);
+      if (
+        clientX >= tooltipOffset.left &&
+        clientX <= tooltipOffset.left + tooltipOffset.width &&
+        clientY >= tooltipOffset.top &&
+        clientY <= tooltipOffset.top + tooltipOffset.height
+      ) {
+        tooltipChild.addEventListener('mouseout', this.onMouseOut.bind(this));
+        return;
+      }
     }
+
     if (hoverOverlay) {
       this.overlay.style('display', 'none');
     }
