@@ -487,10 +487,7 @@ class NegativeBarGraph extends Component {
       const barWidth = parseFloat(mouseData.rect.attr('width'));
       const multiplicator = mouseData.data[0] < 0 ? -1 : 1;
       const leftPos =
-        this.xScale(0) +
-        labelOffsetX -
-        offsetX +
-        (barWidth * multiplicator) / 2;
+        this.xScale(0) + labelOffsetX - offsetX + barWidth * multiplicator / 2;
       const topPos =
         -this.height -
         margin.top -
@@ -502,7 +499,8 @@ class NegativeBarGraph extends Component {
           ? this.yScale1.bandwidth() / 2
           : this.yScale.bandwidth() / 2);
 
-      d3.select(this.tooltipId)
+      d3
+        .select(this.tooltipId)
         .style('position', 'relative')
         .style('z-index', 1)
         .style('left', `${leftPos}px`)

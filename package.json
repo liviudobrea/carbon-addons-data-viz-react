@@ -1,6 +1,6 @@
 {
   "name": "@ibmtm/carbon-addons-data-viz-react",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "Carbon Data Visualization for React",
   "main": "cjs/index.js",
   "module": "es/index.js",
@@ -150,8 +150,5 @@
       "prettier",
       "git add"
     ]
-  },
-  "publishConfig":{
-    "registry":"https://na.artifactory.swg-devops.com/artifactory/api/npm/res-ozya-itm-npm-local/"
   }
 }
