@@ -65,10 +65,12 @@ function createData(num) {
   for (let i = 0; i < num; i++) {
     let tempArr = [];
     const multiplier = i % 2 === 0 ? -1 : 1;
-    let randomNum = Math.floor(Math.random() * 1000 * multiplier + 1);
-    let d = new Date();
-    d = d.setDate(d.getDate() + i * 30);
-    tempArr.push([randomNum], d);
+    const randomNum = Math.floor(Math.random() * 1000 * multiplier + 1);
+    const d = new Date();
+    tempArr.push(
+      [randomNum],
+      d.setDate(d.getDate() + i * 30)
+    );
     data.push(tempArr);
   }
   return data;
@@ -95,10 +97,11 @@ function createGroupedData(num) {
         numArr.push(one);
       }
     }
-    let d = new Date();
-    d = d.setDate(d.getDate() - i * 30);
-    const entry = [numArr, d];
-    data.push(entry);
+    const d = new Date();
+    data.push([
+      numArr,
+      d.setDate(d.getDate() - i * 30)
+    ]);
   }
   return data;
 }
