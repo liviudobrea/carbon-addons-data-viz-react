@@ -107,6 +107,7 @@ const props = {
     left: 65,
   },
   height: 300,
+  enableLabelWrapping: true,
   width: 800,
   labelOffsetY: 55,
   labelOffsetX: 65,
@@ -164,17 +165,65 @@ storiesOf('BarGraph', module)
       <BarGraph
         onHover={action('Hover')}
         data={[
-          [[6810753.913996485, 322316.83828169684], 'NEW YORK, NY, US'],
-          [[2029509.2509859744, 319256.4128819143], 'LONDON, GB'],
+          [[6810753.913996485, 322316.83828169684], 'NEW YORK CITY, NEW YORK, UNITED STATES'],
+          [[2029509.2509859744, 319256.4128819143], 'LONDON, GREAT BRITAIN'],
           [[1180299.5624584288, 98796.86410370439], 'AUSTIN, TX, US'],
           [[997409.8602056602, 301419.9550709436], 'DALLAS, TX, US'],
           [[1306600.6748098487, 82748.73011782495], 'DURHAM, NC, US'],
         ]}
+        width={750}
         yAxisLabel="Amount ($)"
         xAxisLabel=""
+        enableLabelWrapping
         seriesLabels={['Fixed Rate', 'Dynamic Rate']}
       />
     )
+  )
+  .addWithInfo(
+    'Resizing',
+    `
+      Auto resizing Horizontal Bar Graph.
+    `,
+    () => {
+      class ResizingGraph extends React.PureComponent {
+        state = {
+          height: Math.max(300, Math.min(Math.random() * 1000, 300)),
+          width: Math.max(650, Math.min(Math.random() * 1000, 800)),
+        };
+
+        resizeInterval = null;
+
+        componentDidMount() {
+          this.resizeInterval = setInterval(() => {
+            this.setState({
+              height: Math.max(200, Math.min(Math.random() * 1000, 300)),
+              width: Math.max(600, Math.min(Math.random() * 1000, 800)),
+            });
+          }, 2500);
+        }
+
+        componentWillUnmount() {
+          clearInterval(this.resizeInterval);
+          this.resizeInterval = null;
+        }
+
+        render() {
+          const { width, height } = this.state;
+          return (
+            <BarGraph
+              timeFormat="%b"
+              data={data}
+              // xDomain={ _.max(groupedData.flatMap(d => d[0])) * 1.1 }
+              {...props}
+              width={width}
+              height={height}
+            />
+          );
+        }
+      }
+
+      return <ResizingGraph />;
+    }
   )
   .addWithInfo(
     'Updating',

@@ -65,10 +65,12 @@ function createData(num) {
   for (let i = 0; i < num; i++) {
     let tempArr = [];
     const multiplier = i % 2 === 0 ? -1 : 1;
-    let randomNum = Math.floor(Math.random() * 1000 * multiplier + 1);
-    let d = new Date();
-    d = d.setDate(d.getDate() + i * 30);
-    tempArr.push([randomNum], d);
+    const randomNum = Math.floor(Math.random() * 1000 * multiplier + 1);
+    const d = new Date();
+    tempArr.push(
+      [randomNum],
+      d.setDate(d.getDate() + i * 30)
+    );
     data.push(tempArr);
   }
   return data;
@@ -95,10 +97,11 @@ function createGroupedData(num) {
         numArr.push(one);
       }
     }
-    let d = new Date();
-    d = d.setDate(d.getDate() - i * 30);
-    const entry = [numArr, d];
-    data.push(entry);
+    const d = new Date();
+    data.push([
+      numArr,
+      d.setDate(d.getDate() - i * 30)
+    ]);
   }
   return data;
 }
@@ -177,6 +180,52 @@ storiesOf('NegativeBarGraph', module)
         yAxisLabel="Amount ($)"
       />
     )
+  )
+  .addWithInfo(
+    'Resizing',
+    `
+     Resizing Bar Graph.
+    `,
+    () => {
+      class ResizingGraph extends React.PureComponent {
+        state = {
+          height: Math.max(300, Math.min(Math.random() * 1000, 550)),
+          width: Math.max(650, Math.min(Math.random() * 1000, 900)),
+        };
+
+        resizeInterval = null;
+
+        componentDidMount() {
+          this.resizeInterval = setInterval(() => {
+            this.setState({
+              height: Math.max(300, Math.min(Math.random() * 1000, 550)),
+              width: Math.max(650, Math.min(Math.random() * 1000, 900)),
+            });
+          }, 2500);
+        }
+
+        componentWillUnmount() {
+          clearInterval(this.resizeInterval);
+          this.resizeInterval = null;
+        }
+
+        render() {
+          const { width, height } = this.state;
+          return (
+            <NegativeBarGraph
+              onHover={action('Hover')}
+              timeFormat="%b"
+              data={groupedData}
+              {...props}
+              width={width}
+              height={height}
+            />
+          );
+        }
+      }
+
+      return <ResizingGraph />;
+    }
   )
   .addWithInfo(
     'Updating',

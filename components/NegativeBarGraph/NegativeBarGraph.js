@@ -15,6 +15,7 @@ const propTypes = {
   labelOffsetX: PropTypes.number,
   labelOffsetY: PropTypes.number,
   axisOffset: PropTypes.number,
+  xDomain: PropTypes.number,
   xAxisLabel: PropTypes.string,
   yAxisLabel: PropTypes.string,
   onHover: PropTypes.func,
@@ -43,6 +44,7 @@ const defaultProps = {
   yAxisLabel: 'Y Axis',
   onHover: () => {},
   timeFormat: null,
+  xDomain: null,
   formatValue: null,
   formatTooltipData: ({ data, seriesLabels, label, index, rect }) => {
     return [
@@ -60,8 +62,23 @@ const defaultProps = {
 };
 
 class NegativeBarGraph extends Component {
+  constructor(props) {
+    super(props);
+    const { width, height, margin } = this.props;
+
+    this.width = width - (margin.left + margin.right);
+    this.height = height - (margin.top + margin.bottom);
+    this.color = d3.scaleOrdinal(this.props.color);
+  }
+
   componentDidMount() {
-    const { width, height, margin, containerId, emptyText } = this.props;
+    const {
+      width,
+      height,
+      margin,
+      containerId,
+      emptyText
+    } = this.props;
 
     this.emptyContainer = d3
       .select(`#${containerId} .bx--bar-graph-empty-text`)
@@ -81,72 +98,29 @@ class NegativeBarGraph extends Component {
       .attr('class', 'bx--group-container')
       .attr('transform', `translate(${margin.left}, ${margin.top})`);
 
-    this.width = width - (margin.left + margin.right);
-    this.height = height - (margin.top + margin.bottom);
-    this.color = d3.scaleOrdinal(this.props.color);
-
     this.initialRender();
-  }
-
-  componentWillReceiveProps(nextProps) {
-    if (
-      nextProps.height != this.props.height ||
-      nextProps.width != this.props.width
-    ) {
-      this.resize(nextProps.height, nextProps.width);
-    }
-  }
-
-  componentWillUpdate(nextProps) {
-    if (this.yScale) {
-      const dataLength = d3.max(nextProps.data, d => d[0].length);
-      this.yScale.domain(nextProps.data.map(d => d[1]));
-
-      if (dataLength > 1) {
-        if (!this.isGrouped) {
-          this.isGrouped = true;
-
-          this.yScale1 = d3
-            .scaleBand()
-            .rangeRound([this.yScale.bandwidth(), 0])
-            .domain(d3.range(dataLength))
-            .padding(0.1);
-          this.xScale = d3
-            .scaleLinear()
-            .range([0, this.width])
-            .domain(
-              d3.extent(
-                nextProps.data.reduce((acc, item) => acc.concat(item[0]), [])
-              )
-            );
-        } else {
-          this.yScale1
-            .rangeRound([this.yScale.bandwidth(), 0])
-            .domain(d3.range(dataLength));
-          this.xScale.domain(
-            d3.extent(
-              nextProps.data.reduce((acc, item) => acc.concat(item[0]), [])
-            )
-          );
-        }
-      } else {
-        this.isGrouped = false;
-        this.xScale.domain(d3.extent(nextProps.data.map(d => d[0][0])));
-      }
-
-      this.xAxis.scale(this.xScale.nice());
-
-      this.updateEmptyState(nextProps.data);
-      this.updateData(nextProps);
-    }
   }
 
   shouldComponentUpdate(nextProps) {
     return !_.isEqual(this.props, nextProps);
   }
 
+  componentDidUpdate() {
+    const { margin, height, width, containerId } = this.props;
+    this.height = height - (margin.top + margin.bottom);
+    this.width = width - (margin.left + margin.right);
+    this.svg.selectAll('.bx--group-container > g').remove();
+    d3
+      .select(`#${containerId} svg`)
+      .attr('width', width)
+      .attr('height', height)
+      .select('.bx--group-container')
+      .attr('transform', `translate(${margin.left}, ${margin.top})`);
+    this.initialRender();
+  }
+
   initialRender() {
-    const { data, timeFormat, formatValue } = this.props;
+    const { xDomain, data, timeFormat, formatValue } = this.props;
 
     this.updateEmptyState(data);
 
@@ -171,12 +145,20 @@ class NegativeBarGraph extends Component {
       this.xScale = d3
         .scaleLinear()
         .range([0, this.width])
-        .domain(d3.extent(data.reduce((acc, item) => acc.concat(item[0]), [])));
+        .domain(
+          xDomain !== null
+            ? [-xDomain, xDomain]
+            : d3.extent(data.reduce((acc, item) => acc.concat(item[0]), []))
+        );
     } else {
       this.xScale = d3
         .scaleLinear()
         .range([0, this.width])
-        .domain(d3.extent(data.map(d => d[0][0])));
+        .domain(
+          xDomain !== null
+            ? [-xDomain, xDomain]
+            : d3.extent(data.map(d => d[0][0]))
+        );
     }
 
     this.xAxis = d3
@@ -207,7 +189,7 @@ class NegativeBarGraph extends Component {
   }
 
   renderAxes() {
-    const { axisOffset } = this.props;
+    const { axisOffset, containerId, width, margin } = this.props;
 
     this.svg
       .append('g')
@@ -237,6 +219,25 @@ class NegativeBarGraph extends Component {
       .attr('stroke', '#3a403d')
       .attr('stroke-dasharray', 0)
       .attr('stroke-width', '2px');
+
+    const yLabelsContainer = this.svg
+      .select('.bx--axis--y')
+      .node()
+      .getBoundingClientRect();
+
+    this.svg.attr(
+      'transform',
+      `translate(${
+        yLabelsContainer.width > margin.left
+          ? yLabelsContainer.width + axisOffset + 10
+          : margin.left
+      }, ${margin.top})`
+    );
+
+    d3.select(`#${containerId} svg`).attr(
+      'width',
+      width + yLabelsContainer.width
+    );
 
     this.updateStyles();
   }
@@ -320,13 +321,13 @@ class NegativeBarGraph extends Component {
           .transition()
           .duration(750)
           .delay((d, i) => i * 50)
-          .attr(
-            'x',
-            d => (d[0][0] < 0 ? this.xScale(d[0][0]) - 1 : this.xScale(0) + 1)
-          )
+          .attr('x', d => {
+            const value = d[0][0];
+            return value < 0 ? this.xScale(value) - 1 : this.xScale(0) + 1;
+          })
           .attr('width', d => {
             const value = d[0][0];
-            return d[0][0] > 0
+            return value > 0
               ? this.xScale(value) - this.xScale(0)
               : this.xScale(value * -1) - this.xScale(0);
           });
@@ -342,6 +343,11 @@ class NegativeBarGraph extends Component {
   renderLabels() {
     const { labelOffsetY, labelOffsetX, xAxisLabel, yAxisLabel } = this.props;
 
+    const yLabelsContainer = this.svg
+      .select('.bx--axis--y')
+      .node()
+      .getBoundingClientRect();
+
     this.svg
       .select('.bx--axis--y')
       .append('text')
@@ -349,7 +355,14 @@ class NegativeBarGraph extends Component {
       .attr('class', 'bx--graph-label')
       .attr(
         'transform',
-        `translate(${-labelOffsetY}, ${this.height / 2}) rotate(-90)`
+        `translate(
+          ${
+            yLabelsContainer.width > labelOffsetY
+              ? -yLabelsContainer.width - 10
+              : -labelOffsetY
+          },
+          ${this.height / 2}
+        ) rotate(-90)`
       );
 
     this.svg
@@ -434,7 +447,10 @@ class NegativeBarGraph extends Component {
       const barWidth = parseFloat(mouseData.rect.attr('width'));
       const multiplicator = mouseData.data[0] < 0 ? -1 : 1;
       const leftPos =
-        this.xScale(0) + labelOffsetX - offsetX + barWidth * multiplicator / 2;
+        this.xScale(0) +
+        labelOffsetX -
+        offsetX +
+        (barWidth * multiplicator) / 2;
       const topPos =
         -this.height -
         margin.top -
@@ -446,8 +462,7 @@ class NegativeBarGraph extends Component {
           ? this.yScale1.bandwidth() / 2
           : this.yScale.bandwidth() / 2);
 
-      d3
-        .select(this.tooltipId)
+      d3.select(this.tooltipId)
         .style('position', 'relative')
         .style('z-index', 1)
         .style('left', `${leftPos}px`)
@@ -478,61 +493,6 @@ class NegativeBarGraph extends Component {
     ReactDOM.unmountComponentAtNode(this.tooltipId);
   }
 
-  resize(height, width) {
-    const { margin, containerId } = this.props;
-
-    this.height = height - (margin.top + margin.bottom);
-    this.width = width - (margin.left + margin.right);
-
-    this.svg.selectAll('*').remove();
-
-    this.svg = d3
-      .select(`#${containerId} svg`)
-      .attr('class', 'bx--graph')
-      .attr('width', width)
-      .attr('height', height)
-      .append('g')
-      .attr('class', 'bx--group-container')
-      .attr('transform', `translate(${margin.left}, ${margin.top})`);
-
-    this.initialRender();
-  }
-
-  updateData(nextProps) {
-    const { axisOffset, xAxisLabel, yAxisLabel } = nextProps;
-
-    this.svg.selectAll('g.bar-container').remove();
-
-    this.svg
-      .select('.center-line')
-      .transition()
-      .attr('x1', () => this.xScale(0))
-      .attr('x2', () => this.xScale(0))
-      .attr('y1', -this.height)
-      .attr('y2', 0);
-
-    this.svg
-      .select('.bx--axis--y')
-      .transition()
-      .call(this.yAxis)
-      .selectAll('text')
-      .attr('x', -axisOffset);
-
-    this.svg.select('.bx--axis--y .bx--graph-label').text(yAxisLabel);
-
-    this.svg
-      .select('.bx--axis--x')
-      .transition()
-      .call(this.xAxis)
-      .selectAll('text')
-      .attr('y', axisOffset)
-      .style('text-anchor', 'middle');
-
-    this.svg.select('.bx--axis--x .bx--graph-label').text(xAxisLabel);
-
-    this.updateStyles();
-  }
-
   updateEmptyState(data) {
     if (!data.length) {
       this.svg.style('opacity', '.3');
@@ -546,7 +506,6 @@ class NegativeBarGraph extends Component {
   updateStyles() {
     this.svg.selectAll('.bx--axis--x path').style('display', 'none');
     this.svg.selectAll('.bx--axis--y path').style('display', 'none');
-    this.svg.selectAll('.bx--axis path').attr('stroke', '#5A6872');
     this.svg.selectAll('.bx--axis path').attr('stroke', '#5A6872');
     this.svg.selectAll('.tick line').attr('stroke', '#5A6872');
     this.svg.selectAll('.tick text').attr('fill', '#5A6872');
