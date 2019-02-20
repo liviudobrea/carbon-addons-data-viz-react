@@ -101,11 +101,16 @@ class BarGraph extends Component {
     return !_.isEqual(this.props, nextProps);
   }
 
-  componentDidUpdate(nextProps) {
-    const { margin, height, width } = nextProps;
+  componentDidUpdate() {
+    const { margin, height, width, containerId } = this.props;
     this.height = height - (margin.top + margin.bottom);
     this.width = width - (margin.left + margin.right);
     this.svg.selectAll('.bx--group-container > g').remove();
+    d3.select(`#${containerId} svg`)
+      .attr('width', width)
+      .attr('height', height)
+      .select('.bx--group-container')
+      .attr('transform', `translate(${margin.left}, ${margin.top})`);
     this.initialRender();
   }
 
@@ -214,18 +219,20 @@ class BarGraph extends Component {
           ? this.tooltipId.children[0].clientWidth
           : 100;
         d3.select(this.tooltipId)
-          .style('position', 'absolute')
+          .style('position', 'relative')
           .style(
             'transform',
             `translate(
-              ${Math.abs(margin.left + transformMatrix.m41 - tooltipWidth / 2)}px,
+              ${Math.abs(
+                margin.left + transformMatrix.m41 - tooltipWidth / 2
+              )}px,
               0
             )`
-          )
+          );
       })
       .on('mouseout', () => {
         d3.select(this.tooltipId).attr('style', '');
-        ReactDOM.unmountComponentAtNode(this.tooltipId)
+        ReactDOM.unmountComponentAtNode(this.tooltipId);
       });
 
     return wrapText.call(el);
