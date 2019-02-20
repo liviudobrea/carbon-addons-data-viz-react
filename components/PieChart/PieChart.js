@@ -256,17 +256,17 @@ class PieChart extends Component {
         const handleMouseOut = mouseout.bind(this);
         if (showTooltip) {
           if (tooltipChild) {
-            tooltipChild.removeEventListener('mouseout', handleMouseOut);
+            d3.select(tooltipChild).on('mouseout', handleMouseOut);
           }
-          const { clientX, clientY } = d3.event || event;
+          const { pageX, pageY } = d3.event;
           const tooltipOffset = _this.getOffset(tooltipChild);
           if (
-            clientX >= tooltipOffset.left &&
-            clientX <= tooltipOffset.left + tooltipOffset.width &&
-            clientY >= tooltipOffset.top &&
-            clientY <= tooltipOffset.top + tooltipOffset.height
+            pageX >= tooltipOffset.left &&
+            pageX <= tooltipOffset.left + tooltipOffset.width &&
+            pageY >= tooltipOffset.top &&
+            pageY <= tooltipOffset.top + tooltipOffset.height
           ) {
-            tooltipChild.addEventListener('mouseout', handleMouseOut);
+            d3.selectAll(_this.tooltipId).on('mouseout', null);
             return;
           }
         }
