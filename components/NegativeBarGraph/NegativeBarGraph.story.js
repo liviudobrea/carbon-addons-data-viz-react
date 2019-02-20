@@ -67,7 +67,10 @@ function createData(num) {
     const multiplier = i % 2 === 0 ? -1 : 1;
     const randomNum = Math.floor(Math.random() * 1000 * multiplier + 1);
     const d = new Date();
-    tempArr.push([randomNum], d.setDate(d.getDate() + i * 30));
+    tempArr.push(
+      [randomNum],
+      d.setDate(d.getDate() + i * 30)
+    );
     data.push(tempArr);
   }
   return data;
@@ -95,7 +98,10 @@ function createGroupedData(num) {
       }
     }
     const d = new Date();
-    data.push([numArr, d.setDate(d.getDate() - i * 30)]);
+    data.push([
+      numArr,
+      d.setDate(d.getDate() - i * 30)
+    ]);
   }
   return data;
 }
