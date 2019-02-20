@@ -124,8 +124,6 @@ class PieChart extends Component {
       .attr('class', 'group-container')
       .attr('transform', `translate(${width / 2 + 10}, ${height / 2})`);
 
-    this.updateEmptyState(data);
-
     const tooltipId = this.tooltipId;
     const pie = d3
       .pie()
@@ -174,6 +172,7 @@ class PieChart extends Component {
       d3.select(`#${id} .bx--pie-value`).text(`${formatValue(totalAmount)}`);
     }
 
+    this.updateEmptyState(data);
     const _this = this;
 
     this.svg
@@ -257,17 +256,17 @@ class PieChart extends Component {
         const handleMouseOut = mouseout.bind(this);
         if (showTooltip) {
           if (tooltipChild) {
-            tooltipChild.removeEventListener('mouseout', handleMouseOut);
+            d3.select(tooltipChild).on('mouseout', handleMouseOut);
           }
-          const { clientX, clientY } = event;
+          const { pageX, pageY } = d3.event;
           const tooltipOffset = _this.getOffset(tooltipChild);
           if (
-            clientX >= tooltipOffset.left &&
-            clientX <= tooltipOffset.left + tooltipOffset.width &&
-            clientY >= tooltipOffset.top &&
-            clientY <= tooltipOffset.top + tooltipOffset.height
+            pageX >= tooltipOffset.left &&
+            pageX <= tooltipOffset.left + tooltipOffset.width &&
+            pageY >= tooltipOffset.top &&
+            pageY <= tooltipOffset.top + tooltipOffset.height
           ) {
-            tooltipChild.addEventListener('mouseout', handleMouseOut);
+            d3.selectAll(_this.tooltipId).on('mouseout', null);
             return;
           }
         }
