@@ -10,9 +10,7 @@ const propTypes = {
    * If your data set has a single series, or multiple series with all the same x values, use the data prop, and format like this: [[y1a, y1b, ... , x1], [y2a, y2b, ... , x2], ...]
    */
   data: PropTypes.arrayOf(
-    PropTypes.arrayOf(
-      PropTypes.oneOfType([PropTypes.number, PropTypes.string])
-    )
+    PropTypes.arrayOf(PropTypes.oneOfType([PropTypes.number, PropTypes.string]))
   ),
   /**
    * If your data set has multiple series with different x values, use the datasets prop, and format like this: [[[y1a, x1a], [y2a, x2a], ...], [[y1b, x1b], [y2b, x2b], ...], ...]
@@ -141,7 +139,7 @@ class LineGraph extends Component {
       showLegend,
       data,
       datasets,
-      seriesLabels
+      seriesLabels,
     } = this.props;
 
     this.width =
@@ -156,19 +154,14 @@ class LineGraph extends Component {
     this.color = d3.scaleOrdinal(this.props.color);
     this.mapData = this.mapData.bind(this);
     this.tickFormat = this.tickFormat.bind(this);
-    this.flatData = data.length > 0 ?
-      data.map(this.mapData)
-      : _.flatten(datasets.map(dataset => dataset.map(this.mapData)));
+    this.flatData =
+      data.length > 0
+        ? data.map(this.mapData)
+        : _.flatten(datasets.map(dataset => dataset.map(this.mapData)));
   }
 
   componentDidMount() {
-    const {
-      width,
-      height,
-      margin,
-      containerId,
-      emptyText,
-    } = this.props;
+    const { width, height, margin, containerId, emptyText } = this.props;
 
     this.emptyContainer = d3
       .select(`#${containerId} .bx--line-graph-empty-text`)
@@ -204,7 +197,7 @@ class LineGraph extends Component {
       height,
       showLegend,
       width,
-      containerId
+      containerId,
     } = this.props;
 
     this.width =
@@ -215,12 +208,12 @@ class LineGraph extends Component {
           ? 30 + _.max(seriesLabels.map(l => l.length)) * 8
           : 0));
     this.height = height - (margin.left + margin.right);
-    this.flatData = data.length > 0 ?
-      data.map(this.mapData)
-      : _.flatten(datasets.map(dataset => dataset.map(this.mapData)));
+    this.flatData =
+      data.length > 0
+        ? data.map(this.mapData)
+        : _.flatten(datasets.map(dataset => dataset.map(this.mapData)));
     this.svg.selectAll('.bx--group-container > *').remove();
-    d3
-      .select(`#${containerId} svg`)
+    d3.select(`#${containerId} svg`)
       .attr('width', width)
       .attr('height', height)
       .select('.bx--group-container')
@@ -255,9 +248,9 @@ class LineGraph extends Component {
     const { isXTime, isUTC } = this.props;
     const date = d[d.length - 1];
     if (isXTime || isUTC) {
-      return { rawDate: date, date: new Date(date), value: d[0] }
+      return { rawDate: date, date: new Date(date), value: d[0] };
     }
-    return { rawDate: date, date, value: d[0] }
+    return { rawDate: date, date, value: d[0] };
   }
 
   tickFormat(d) {
@@ -663,8 +656,8 @@ class LineGraph extends Component {
           distances.push({ a, aDist });
           return aDist;
         })[0];
-        const i = datasets.findIndex(
-          set => set.some(s => s[0] === d.value && s[1] === d.rawDate)
+        const i = datasets.findIndex(set =>
+          set.some(s => s[0] === d.value && s[1] === d.rawDate)
         );
 
         if (hoverOverlay) {
@@ -714,9 +707,7 @@ class LineGraph extends Component {
           graphYArray: [d.value].map(this.y),
         };
 
-        const xVal = isXTime
-          ? d3.timeFormat(timeFormat)(d.date)
-          : d.date;
+        const xVal = isXTime ? d3.timeFormat(timeFormat)(d.date) : d.date;
 
         tooltipHeading = d.value.length > 2 || multiValueTooltip ? xVal : null;
 
@@ -742,15 +733,13 @@ class LineGraph extends Component {
           .node()
           .getBoundingClientRect();
         const offset = -tooltipSize.width / 2;
+        const value = Array.isArray(d) ? _.max(_.dropRight(d)) : d.value;
         d3.select(this.tooltipId)
           .style('position', 'relative')
           .style('left', `${mouseData.graphX + labelOffsetX + offset}px`)
           .style(
             'top',
-            `${this.y(_.max(_.dropRight(d))) -
-              height -
-              tooltipSize.height +
-              10}px`
+            `${this.y(value) - height - tooltipSize.height + 10}px`
           );
       }
     }
